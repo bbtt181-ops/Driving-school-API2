@@ -247,6 +247,25 @@ body.dark{
 }
 body.dark .fi{background:#0F172A;color:var(--t1)}
 body.dark .modal{background:var(--sf)}
+/* Dark mode — force white text on elements that might show black */
+body.dark .sn{color:var(--t1);font-weight:700}
+body.dark .ir-v{color:var(--t1)}
+body.dark .ir-l{color:var(--t2)}
+body.dark .pi-n{color:var(--t1);font-weight:700}
+body.dark .li-n{color:var(--t1);font-weight:700}
+body.dark .test-date{color:var(--t1);font-weight:700}
+body.dark .pi-amt{color:var(--t1)}
+body.dark .cal-mon{color:var(--t1)}
+body.dark .m-title{color:var(--t1)}
+body.dark .st{color:var(--t1);font-weight:700}
+body.dark .kpi-val{color:var(--t1)}
+body.dark .sdh-val{color:white}
+body.dark .chk-lbl{color:var(--t1);font-weight:600}
+body.dark .fl{color:var(--t2);font-weight:700}
+body.dark .note-txt{color:var(--t1)}
+body.dark .tab{color:var(--t2)}
+body.dark .tab.active{color:var(--pl)}
+body.dark .fw7,.dark .fw8{color:var(--t1)}
 body.dark .srch input{background:var(--sf);color:var(--t1)}
 body.dark #bottom-nav{background:var(--sf)}
 body.dark .chk-box{border-color:#64748B}
@@ -724,12 +743,13 @@ function renderStudents(){
   const listHTML=list.length===0?`<div class="empty"><div class="empty-ico">👥</div><div class="empty-t">אין תלמידים</div><div class="empty-d">לחץ + להוספת תלמיד</div></div>`:
     list.map(s=>{
       const bal=calcBalance(s.id);
-      const done=S.lessons.filter(l=>l.studentId===s.id&&l.status==='done'&&l.type==='lesson').length;
+      const done=S.lessons.filter(l=>l.studentId===s.id&&l.status==='done'&&l.type==='lesson').reduce((a,l)=>a+(Number(l.duration)||1),0);
       return `<div class="sc" onclick="openStudent('${s.id}')">
         <div class="ava" style="background:${avaColor(s.name)}">${initials(s.name)}</div>
         <div class="si">
           <div class="sn">${s.name}</div>
-          <div class="sm"><span>${s.phone}</span><span>·</span><span>${done} שיעורים</span><span>·</span><span class="badge ${s.pkg==='per_lesson'?'bgr':s.pkg==='basic'?'bb':'by'}">${PKG[s.pkg]?.name||''}</span></div>
+          <div class="sm"><span>${s.phone}</span><span>·</span><span>${done} יח'</span></div>
+          <div class="sm" style="margin-top:3px">${pkgBadge(s)}</div>
         </div>
         ${bal.debt>0?`<div class="sdebt"><div class="sdebt-a">${fmtCur(bal.debt)}</div><div class="sdebt-l">חוב</div></div>`:'<div class="sdebt"><div style="font-size:18px">✅</div></div>'}
       </div>`;
@@ -755,7 +775,7 @@ function renderStudentDetail(){
   if(!s) return '<div class="empty"><div class="empty-t">תלמיד לא נמצא</div></div>';
   const bal=calcBalance(s.id);
   const lessons=S.lessons.filter(l=>l.studentId===s.id).sort((a,b)=>b.date.localeCompare(a.date)||b.time.localeCompare(a.time));
-  const done=lessons.filter(l=>l.status==='done'&&l.type==='lesson').length;
+  const done=lessons.filter(l=>l.status==='done'&&l.type==='lesson').reduce((a,l)=>a+(Number(l.duration)||1),0);
   const payments=S.payments.filter(p=>p.studentId===s.id).sort((a,b)=>b.date.localeCompare(a.date));
   const tests=lessons.filter(l=>l.type==='test').sort((a,b)=>a.date.localeCompare(b.date));
   const age=calcAge(s.dob);
@@ -796,6 +816,9 @@ function renderStudentDetail(){
     <div class="m-foot" style="padding:16px">
       <button class="btn btn-p btn-full" onclick="showAddPayment('${s.id}')">➕ רשום תשלום</button>
       <button class="btn btn-g" onclick="showAddLesson('${s.id}')">+ שיעור</button>
+    </div>
+    <div class="px16" style="padding:8px 16px 0">
+      <button class="btn btn-w btn-full" onclick="showSettlement('${s.id}')">💼 התחשבנות וסיום תקופה</button>
     </div>`;
   } else if(S.detailTab==='lessons'){
     const lessonHTML=lessons.length===0?`<div class="empty"><div class="empty-ico">📚</div><div class="empty-t">אין שיעורים עדיין</div></div>`:
@@ -848,11 +871,11 @@ function renderStudentDetail(){
     <div class="sdh-ava">${initials(s.name)}</div>
     <div class="sdh-name">${s.name}</div>
     <div class="tag-row">
-      <span class="badge" style="background:rgba(255,255,255,.2);color:white">${pkg?.name}</span>
+      <span class="badge" style="background:rgba(255,255,255,.2);color:white">${s.pkg==='per_lesson'?'🎯 פרטני '+s.price+'₪':s.pkg==='basic'?'📦 '+pkg?.name:'⭐ '+pkg?.name}</span>
       ${bal.debt>0?`<span class="badge br">חוב ${fmtCur(bal.debt)}</span>`:`<span class="badge bg">מסולק ✅</span>`}
     </div>
     <div class="sdh-stats">
-      <div class="sdh-stat"><div class="sdh-val">${done}</div><div class="sdh-lbl">שיעורים</div></div>
+      <div class="sdh-stat"><div class="sdh-val">${done}</div><div class="sdh-lbl">יח' שיעור</div></div>
       <div class="sdh-stat"><div class="sdh-val">${tests.length}</div><div class="sdh-lbl">טסטים</div></div>
       <div class="sdh-stat"><div class="sdh-val">${payments.length}</div><div class="sdh-lbl">תשלומים</div></div>
     </div>
@@ -893,7 +916,117 @@ function lessonPrice(l,s){
   return (s.price||0)*(l.duration||1);
 }
 
+
+function pkgBadge(s){
+  if(s.pkg==='per_lesson') return `<span class="badge" style="background:#FFF7ED;color:#C2410C;font-size:11px;border:1.5px solid #FED7AA">🎯 פרטני ${s.price||''}₪</span>`;
+  if(s.pkg==='basic') return `<span class="badge bb" style="font-size:11px">📦 חבילת בסיס</span>`;
+  if(s.pkg==='premium') return `<span class="badge by" style="font-size:11px">⭐ פרימיום</span>`;
+  return `<span class="badge bgr">${PKG[s.pkg]?.name||''}</span>`;
+}
+
 function setDetailTab(t){ S.detailTab=t; renderContent(); }
+
+
+// ═══════════════════════════════════════════════
+// SETTLEMENT — התחשבנות תקופתית
+// ═══════════════════════════════════════════════
+function calcPeriodStats(sid, fromDate){
+  const student=S.students.find(s=>s.id===sid);
+  if(!student) return null;
+  const ls=S.lessons.filter(l=>l.studentId===sid&&l.status==='done'&&(!fromDate||l.date>=fromDate));
+  const ps=S.payments.filter(p=>p.studentId===sid&&(!fromDate||p.date>=fromDate));
+  const regularUnits=ls.filter(l=>l.type==='lesson').reduce((a,l)=>a+(Number(l.duration)||1),0);
+  const testCount=ls.filter(l=>l.type==='test').length;
+  const internalCount=ls.filter(l=>l.type==='internal').length;
+  const parkingCount=ls.filter(l=>l.type==='parking').length;
+  const lessonsCost=regularUnits*(Number(student.price)||0);
+  const testsCost=testCount*TEST_PRICE;
+  const internalCost=internalCount*INTERNAL_PRICE;
+  const totalCost=lessonsCost+testsCost+internalCost;
+  const totalPaid=ps.reduce((a,p)=>a+Number(p.amount||0),0);
+  return {regularUnits,testCount,internalCount,parkingCount,lessonsCost,testsCost,internalCost,totalCost,totalPaid,balance:totalCost-totalPaid};
+}
+
+function showSettlement(sid){
+  const s=S.students.find(x=>x.id===sid);
+  if(!s)return;
+  const fromDate=s.billingStart||(s.startDate?s.startDate.split('T')[0]:null);
+  const stats=calcPeriodStats(sid,fromDate);
+  if(!stats)return;
+  const balColor=stats.balance>0?'tr':stats.balance<0?'tc':'tm';
+  const balLabel=stats.balance>0?'יתרה לגבייה':stats.balance<0?'זכות':'מסולק';
+  const balVal=stats.balance!==0?fmtCur(Math.abs(stats.balance)):'✅';
+  openModal(`
+  <div class="m-handle"></div>
+  <div class="m-hdr"><span class="m-title">💼 התחשבנות — ${s.name}</span><button class="m-close" onclick="closeModal()">×</button></div>
+  <div class="m-body">
+    <div style="font-size:12px;color:var(--t2);margin-bottom:12px;background:var(--bg);padding:8px 10px;border-radius:var(--rs)">
+      📅 תקופה: ${fromDate?fmtDate(fromDate):'תחילת לימודים'} — היום
+    </div>
+    <div class="card cp" style="margin-bottom:12px">
+      ${stats.regularUnits>0?`<div class="ir"><span class="ir-l">שיעורים (${stats.regularUnits} יח')</span><span class="ir-v">${fmtCur(stats.lessonsCost)}</span></div>`:''}
+      ${stats.testCount>0?`<div class="ir"><span class="ir-l">טסטים (${stats.testCount})</span><span class="ir-v">${fmtCur(stats.testsCost)}</span></div>`:''}
+      ${stats.internalCount>0?`<div class="ir"><span class="ir-l">מבחן פנימי (${stats.internalCount})</span><span class="ir-v">${fmtCur(stats.internalCost)}</span></div>`:''}
+      ${stats.parkingCount>0?`<div class="ir"><span class="ir-l">חניות (${stats.parkingCount})</span><span class="ir-v tm">ביצוע — ללא חיוב</span></div>`:''}
+      ${stats.regularUnits===0&&stats.testCount===0&&stats.internalCount===0?`<div style="padding:12px 0;color:var(--t3);font-size:13px;text-align:center">אין שיעורים בתקופה זו</div>`:''}
+      <div class="ir" style="border-top:1.5px solid var(--bd);margin-top:6px;padding-top:8px"><span class="ir-l fw7">סה"כ לחיוב</span><span class="ir-v fw7">${fmtCur(stats.totalCost)}</span></div>
+      <div class="ir"><span class="ir-l tc">שולם בתקופה</span><span class="ir-v tc fw7">− ${fmtCur(stats.totalPaid)}</span></div>
+      <div class="ir" style="border-top:2px solid var(--bd);margin-top:4px;padding-top:8px">
+        <span class="ir-l fw8" style="font-size:15px">${balLabel}</span>
+        <span class="ir-v fw8 ${balColor}" style="font-size:18px">${balVal}</span>
+      </div>
+    </div>
+  </div>
+  <div class="m-foot">
+    <button class="btn btn-o" onclick="closeModal()">סגור</button>
+    <button class="btn btn-p" style="flex:1" onclick="showNewPeriod('${sid}')">📂 פתח תקופה חדשה</button>
+  </div>
+  <div style="height:8px"></div>`);
+}
+
+function showNewPeriod(sid){
+  const s=S.students.find(x=>x.id===sid);
+  if(!s)return;
+  openModal(`
+  <div class="m-handle"></div>
+  <div class="m-hdr"><span class="m-title">📂 תקופה חדשה — ${s.name}</span><button class="m-close" onclick="closeModal()">×</button></div>
+  <div class="m-body">
+    <div class="alert-box alert-w mb12"><div class="alert-ico">ℹ️</div><div class="alert-txt">פתיחת תקופה חדשה לא מוחקת שיעורים קודמים. ניתן תמיד לראות את ההיסטוריה המלאה בטאב שיעורים.</div></div>
+    <div class="fg"><label class="fl">סוג תמחור</label>
+      <select class="fi fsel" id="np-pkg">
+        <option value="basic" ${s.pkg==='basic'?'selected':''}>📦 חבילת בסיס — ₪5,200</option>
+        <option value="premium" ${s.pkg==='premium'?'selected':''}>⭐ חבילת פרימיום — ₪5,800</option>
+        <option value="per_lesson" ${s.pkg==='per_lesson'?'selected':''}>🎯 לפי שיעור</option>
+      </select>
+    </div>
+    <div class="fg"><label class="fl">מחיר לשיעור (₪)</label>
+      <select class="fi fsel" id="np-price">
+        ${PRICES.map(p=>`<option value="${p}" ${s.price===p?'selected':''}>${p}₪</option>`).join('')}
+      </select>
+    </div>
+    <div class="fg"><label class="fl">תאריך תחילת תקופה</label>
+      <input class="fi" id="np-start" type="date" value="${todayStr()}">
+    </div>
+  </div>
+  <div class="m-foot">
+    <button class="btn btn-o" onclick="showSettlement('${sid}')">← חזור</button>
+    <button class="btn btn-p" style="flex:1" onclick="startNewPeriod('${sid}')">✅ התחל תקופה</button>
+  </div>
+  <div style="height:8px"></div>`);
+}
+
+function startNewPeriod(sid){
+  const s=S.students.find(x=>x.id===sid);
+  if(!s)return;
+  const pkg=document.getElementById('np-pkg')?.value;
+  const price=parseInt(document.getElementById('np-price')?.value||'0');
+  const start=document.getElementById('np-start')?.value;
+  s.pkg=pkg; s.price=price; s.billingStart=start||todayStr();
+  dbStudent(s);
+  closeModal();
+  toast('תקופה חדשה נפתחה ✅','ok');
+  renderContent();
+}
 
 // ═══════════════════════════════════════════════
 // CALENDAR
@@ -1189,10 +1322,15 @@ function checkAge(dob){
 function validateTZField(inp){
   const el=document.getElementById('tz-err');
   const val=inp.value.trim();
-  if(!val||val.length<9){ if(el)el.style.display='none'; inp.classList.remove('err'); return; }
+  if(!val||val.length<9){ if(el)el.style.display='none'; inp.classList.remove('err'); setSaveBtnState(true); return; }
   const valid=validTZ(val);
   if(el) el.style.display=valid?'none':'block';
   inp.classList.toggle('err',!valid);
+  setSaveBtnState(valid);
+}
+function setSaveBtnState(enabled){
+  const btn=document.querySelector('#mc .m-foot .btn-p');
+  if(btn){btn.disabled=!enabled;btn.style.opacity=enabled?'':'0.5';btn.style.cursor=enabled?'':'not-allowed';}
 }
 
 function togglePriceField(){
