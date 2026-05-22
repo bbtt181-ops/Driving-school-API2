@@ -881,7 +881,7 @@ function toggleCheck(sid,field){
   const s=S.students.find(x=>x.id===sid);
   if(!s)return;
   s[field]=!s[field];
-  dbSave();
+  dbStudent(s); // שומר מקומית + שולח לשיטס
   renderContent();
 }
 
@@ -1262,7 +1262,7 @@ function archiveStudent(id){
   if(!s)return;
   if(!confirm('להעביר את '+s.name+' לארכיון?'))return;
   s.status='archived'; s.archivedDate=todayStr();
-  dbSave(); apiSave('Students',s); closeModal(); navigate('students');
+  dbStudent(s); closeModal(); navigate('students');
   toast(s.name+' הועבר לארכיון','ok');
 }
 
@@ -1435,8 +1435,7 @@ function editLesson(id){
         <div class="fi" style="background:#F8FAFC;color:var(--ok);font-weight:700">₪230</div>
       </div>
     </div>
-    <div class="fg"><label class="fl">סטטוס</label>
-      <select class="fi fsel" id="f-lstatus">
+    
         <option value="scheduled" ${l.status==='scheduled'?'selected':''}>מתוכנן</option>
         <option value="done" ${l.status==='done'?'selected':''}>בוצע</option>
         <option value="cancelled" ${l.status==='cancelled'?'selected':''}>בוטל</option>
@@ -1461,10 +1460,11 @@ function copyLesson(id){
   renderContent();
 }
 
+// ✅ FIX: שומר מקומית + שולח לשיטס
 function updateLessonStatus(id,status){
   const l=S.lessons.find(x=>x.id===id);
   if(!l)return;
-  l.status=status; dbSave(); closeModal();
+  l.status=status; dbLesson(l); closeModal();
   toast('סטטוס עודכן','ok'); renderContent();
 }
 function deleteLesson(id){ if(!confirm('למחוק שיעור זה?'))return; dbDelLesson(id); closeModal(); toast('שיעור נמחק','ok'); renderContent(); }
@@ -1538,7 +1538,6 @@ function toast(msg,type=''){
 // BIND EVENTS
 // ═══════════════════════════════════════════════
 function bindEvents(){
-  // swipe-to-dismiss search focus on scroll
   const content=document.getElementById('content');
   if(content) content.addEventListener('scroll',()=>{ const si=document.getElementById('search-q'); if(si)si.blur(); },{passive:true});
 }
@@ -1546,7 +1545,6 @@ function bindEvents(){
 // ═══════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════
-// אוטו-בוצע: שיעורים מתוכננים שהיום שלהם עבר → מעבר אוטומטי ל"בוצע"
 function autoCompletePastLessons(){
   const today = todayStr();
   let count = 0;
@@ -1558,30 +1556,63 @@ function autoCompletePastLessons(){
   });
   if(count > 0){
     dbSave();
-    console.log(`אוטו-בוצע: ${count} שיעורים הועברו לסטטוס "בוצע"`);
+    console.log(`אוטו-בוצע: ${count} שיעורים`);
   }
 }
 
+// ✅ סנכרון חכם מהשיטס (לא מרנדר אם לא השתנה)
+async function syncFromSheets(silent=false){
+  if(!hasAPI()) return false;
+  try {
+    const res  = await fetch(API_URL);
+    const json = await res.json();
+    if(json.ok && json.data){
+      const newHash = JSON.stringify(json.data);
+      if(newHash === S._lastSheetsHash) return true; // לא השתנה
+      S._lastSheetsHash = newHash;
+      S.students = json.data.students || [];
+      S.lessons  = json.data.lessons  || [];
+      S.payments = json.data.payments || [];
+      dbSave();
+      autoCompletePastLessons();
+      renderContent();
+      if(!silent) showSyncStatus('✅ מסונכרן', 2000);
+      return true;
+    }
+  } catch(e){ console.warn('sync error', e); }
+  return false;
+}
+
 async function init(){
-  // מצב לילה
   if(localStorage.getItem('dp_dark')==='1') document.body.classList.add('dark');
-  // טען מה-cache המקומי מיד (מהיר)
   dbLoad();
   autoCompletePastLessons();
   navigate('dashboard');
 
-  // נסה לסנכרן מ-Google Sheets ברקע
+  // סנכרון ראשוני מהשיטס
   if(hasAPI()){
     showSyncStatus('⟳ מסנכרן עם Google Sheets...');
-    const ok = await apiLoadAll();
+    const ok = await syncFromSheets(true);
     if(ok){
-      autoCompletePastLessons();
-      renderContent();
       showSyncStatus('✅ מסונכרן עם Google Sheets', 3000);
     } else {
       showSyncStatus('⚠️ לא ניתן להתחבר לענן — עובד מקומית', 4000);
     }
   }
+
+  // ✅ AUTO-REFRESH: כשהאפ חוזר מהרקע — טוען עדכונים
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible' && hasAPI()){
+      syncFromSheets(true);
+    }
+  });
+
+  // ✅ POLLING: כל 30 שניות — בודק שינויים מכל מכשיר
+  setInterval(() => {
+    if(hasAPI() && document.visibilityState === 'visible'){
+      syncFromSheets(true);
+    }
+  }, 30000);
 }
 
 window.addEventListener('DOMContentLoaded', init);
