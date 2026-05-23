@@ -882,7 +882,7 @@ function renderStudentDetail(){
         </div>
         <div class="pi-amt ${l.status==='done'?'pi-pos':'tm'}">${l.status==='done'?fmtCur(lessonPrice(l,s)):'—'}</div>
       </div>`).join('')}</div>`;
-    tabContent=`${lessonHTML}<div class="px16 mt8"><button class="btn btn-p btn-full" onclick="showAddLesson('${s.id}')">➕ הוסף שיעור</button></div><div style="height:16px"></div>`;
+    tabContent=`${lessonHTML}<div class="px16 mt8"><button class="btn btn-p btn-full" onclick="showAddLesson('${s.id}')">➕ הוסף שיעור</button></div><div style="height:90px"></div>`;
   } else if(S.detailTab==='payments'){
     const payHTML=payments.length===0?`<div class="empty"><div class="empty-ico">💰</div><div class="empty-t">אין תשלומים</div></div>`:
       `<div class="card" style="margin:12px 16px">${payments.map(p=>`
@@ -896,7 +896,7 @@ function renderStudentDetail(){
       <div class="ir"><span class="ir-l tc">שולם עד כה</span><span class="ir-v tc fw7">− ${fmtCur(bal.paid)}</span></div>
       <div class="ir" style="border-top:2px solid var(--bd);margin-top:4px;padding-top:8px"><span class="ir-l fw8">${bal.debt<0?'זכות':'יתרת חוב'}</span><span class="ir-v fw8 ${bal.debt>0?'tr':bal.debt<0?'tc':'tm'}" style="font-size:16px">${bal.debt>0?fmtCur(bal.debt):bal.debt<0?fmtCur(-bal.debt):'מסולק ✅'}</span></div>
     </div>`;
-    tabContent=`${summary}${payHTML}<div class="px16 mt8"><button class="btn btn-p btn-full" onclick="showAddPayment('${s.id}')">➕ רשום תשלום</button></div><div style="height:16px"></div>`;
+    tabContent=`${summary}${payHTML}<div class="px16 mt8"><button class="btn btn-p btn-full" onclick="showAddPayment('${s.id}')">➕ רשום תשלום</button></div><div style="height:90px"></div>`;
   } else if(S.detailTab==='tests'){
     const testHTML=tests.length===0?`<div class="empty"><div class="empty-ico">🎯</div><div class="empty-t">אין טסטים רשומים</div></div>`:
       `<div class="card" style="margin:12px 16px">${tests.map((t,i)=>`
@@ -909,7 +909,7 @@ function renderStudentDetail(){
     tabContent=`<div class="card cp" style="margin:12px 16px">
       <div class="fjb"><span class="ir-l">טסטים שבוצעו</span><span class="fw7">${tests.length} / ${max}</span></div>
       <div class="pb-w mt8"><div class="pb-f" style="width:${tests.length/max*100}%;background:linear-gradient(90deg,var(--er),var(--wa))"></div></div>
-    </div>${testHTML}<div class="px16 mt8"><button class="btn btn-p btn-full" onclick="showAddLesson('${s.id}','test')">➕ הוסף טסט</button></div><div style="height:16px"></div>`;
+    </div>${testHTML}<div class="px16 mt8"><button class="btn btn-p btn-full" onclick="showAddLesson('${s.id}','test')">➕ הוסף טסט</button></div><div style="height:90px"></div>`;
   } else if(S.detailTab==='notes'){
     const noteLessons=lessons.filter(l=>l.notes&&l.notes.trim());
     const noteHTML=noteLessons.length===0?`<div class="empty"><div class="empty-ico">📝</div><div class="empty-t">אין הערות</div><div class="empty-d">הוסף הערות בעת רישום שיעור</div></div>`:
@@ -1144,7 +1144,7 @@ function renderPayments(){
   ${debtHTML}
   <div class="sh"><span class="st">תשלומים אחרונים</span><button class="sa btn" onclick="showAddPayment()">+ תשלום</button></div>
   ${payHTML}
-  <div style="height:16px"></div>`;
+  <div style="height:90px"></div>`;
 }
 
 // ═══════════════════════════════════════════════
