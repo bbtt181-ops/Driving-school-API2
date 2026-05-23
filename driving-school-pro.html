@@ -399,7 +399,7 @@ async function clearAllData(){
   // מחיקה מהשיטס אם מחובר
   if(hasAPI()){
     try {
-      await fetch(API_URL, {
+      await fetch(API_URL, { credentials:'omit',
         method:'POST',
         headers:{'Content-Type':'text/plain;charset=utf-8'},
         body: JSON.stringify({action:'clearAll'})
@@ -423,7 +423,7 @@ async function saveApiUrl(){
 
   // בדיקה ראשונה — מה יש בשיטס כבר
   try {
-    const res = await fetch(API_URL);
+    const res = await fetch(API_URL, { credentials:'omit' });
     const json = await res.json();
     if(!json.ok){ if(el){el.style.color='var(--er)';el.textContent='❌ שגיאה משרת — בדוק הרשאות';} return; }
 
@@ -434,7 +434,7 @@ async function saveApiUrl(){
     if(localHasData && !sheetsHasData){
       // שיטס ריק, יש נתונים מקומיים → דחוף לשיטס
       if(el)el.textContent='⟳ מעלה נתונים קיימים לשיטס...';
-      await fetch(API_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+      await fetch(API_URL, { credentials:'omit', method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
         body: JSON.stringify({action:'saveAll', type:'all', data:{students:S.students, lessons:S.lessons, payments:S.payments}})
       });
       if(el){el.style.color='var(--ok)';el.textContent=`✅ ${S.students.length} תלמידים הועלו לשיטס בהצלחה!`;}
@@ -532,7 +532,7 @@ function hasAPI(){ return API_URL && API_URL.length > 10; }
 async function apiPost(action, type, data){
   if(!hasAPI()) return;
   try {
-    await fetch(API_URL, {
+    await fetch(API_URL, { credentials:'omit',
       method:'POST',
       body: JSON.stringify({action, type, data}),
       headers:{'Content-Type':'text/plain;charset=utf-8'}
@@ -543,7 +543,7 @@ async function apiPost(action, type, data){
 async function apiLoadAll(){
   if(!hasAPI()) return false;
   try {
-    const res  = await fetch(API_URL + '?action=getAll');
+    const res  = await fetch(API_URL + '?action=getAll', { credentials:'omit' });
     const json = await res.json();
     if(json.ok && json.data){
       S.students = json.data.students || [];
@@ -933,7 +933,7 @@ function renderStudentDetail(){
     <div class="sdh-stats">
       <div class="sdh-stat"><div class="sdh-val">${done}</div><div class="sdh-lbl">שיעורים</div></div>
       <div class="sdh-stat"><div class="sdh-val">${tests.length}</div><div class="sdh-lbl">טסטים</div></div>
-      <div class="sdh-stat"><div class="sdh-val">${payments.length}</div><div class="sdh-lbl">תשלומים</div></div>
+      <div class="sdh-stat"><div class="sdh-val" style="font-size:13px">${fmtCur(bal.paid)}</div><div class="sdh-lbl">שולם</div></div>
     </div>
   </div>
   <div class="tabs">${tabsHTML}</div>
@@ -1349,7 +1349,7 @@ async function deleteStudent(id){
   // מחיקה משיטס
   if(hasAPI()){
     try{
-      await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      await fetch(API_URL,{credentials:'omit',method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
         body:JSON.stringify({action:'deleteStudent',data:{id}})});
     }catch(e){}
   }
@@ -1651,117 +1651,4 @@ function deleteLesson(id){
     <div style="text-align:center;padding:16px 0 8px">
       <div style="font-size:40px;margin-bottom:10px">?</div>
       <div style="font-size:15px;font-weight:700;margin-bottom:6px">למחוק את השיעור?</div>
-      <div style="font-size:13px;color:var(--t2)">${st?st.name:'?'} &bull; ${fmtDate(l.date)} &bull; ${l.time||''}</div>
-      <div style="font-size:12px;color:var(--er);margin-top:8px">פעולה זו לא ניתנת לביטול</div>
-    </div>
-  </div>
-  <div class="m-foot">
-    <button class="btn btn-o" style="flex:1" onclick="closeModal()">ביטול</button>
-    <button class="btn btn-d" style="flex:1" onclick="confirmDeleteLesson('${id}')">מחק</button>
-  </div>
-  <div style="height:8px"></div>`);
-}
-
-function confirmDeleteLesson(id){
-  dbDelLesson(id);
-  closeModal();
-  toast('שיעור נמחק','ok');
-  renderContent();
-}
-
-function updateLessonStatus(id,status){
-  const l=S.lessons.find(x=>x.id===id);
-  if(!l)return;
-  l.status=status;
-  dbLesson(l);
-  closeModal();
-  const labels={done:'סומן כבוצע',cancelled:'שיעור בוטל',noshow:'תלמיד לא הגיע',scheduled:'חזר למתוכנן'};
-  toast(labels[status]||'עודכן','ok');
-  renderContent();
-}
-
-// ═══════════════════════════════════════════════════════════
-// תצוגת גריד שעות — בסגנון Google Calendar
-// ═══════════════════════════════════════════════════════════
-const GRID_START=7,GRID_END=21,GRID_SLOT_H=56;
-const LESSON_COLORS={
-  lesson:  {bg:'#EFF6FF',border:'#3B82F6',text:'#1E40AF'},
-  internal:{bg:'#F0FDF4',border:'#22C55E',text:'#15803D'},
-  test:    {bg:'#FEF3C7',border:'#F59E0B',text:'#92400E'},
-  parking: {bg:'#F5F3FF',border:'#8B5CF6',text:'#5B21B6'}
-};
-
-function renderCalGrid(){
-  const d=S.calDate;
-  const ds=localStr(d);
-  const today2=todayStr();
-  const isToday=ds===today2;
-  const dayNames=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
-  const dateLabel=`יום ${dayNames[d.getDay()]}, ${d.getDate()} ${HE_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-  const ls=S.lessons.filter(l=>l.date===ds).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
-  const totalH=(GRID_END-GRID_START)*GRID_SLOT_H;
-  let blocksHTML='';
-  ls.forEach(l=>{
-    if(!l.time)return;
-    const [hh,mm]=l.time.split(':').map(Number);
-    if(hh<GRID_START||hh>=GRID_END)return;
-    const st=S.students.find(s=>s.id===l.studentId);
-    const dur=l.type==='test'?1:(parseFloat(l.duration)||1);
-    const topPx=((hh-GRID_START)*60+mm)/60*GRID_SLOT_H;
-    const heightPx=Math.max(dur*GRID_SLOT_H*(40/60),38);
-    const col=LESSON_COLORS[l.type]||LESSON_COLORS.lesson;
-    const opacity=l.status==='cancelled'?'0.45':'1';
-    blocksHTML+=`<div onclick="openLesson('${l.id}')" style="position:absolute;right:66px;left:6px;top:${topPx}px;height:${heightPx}px;background:${col.bg};border-right:3px solid ${col.border};border-radius:6px;padding:4px 8px;cursor:pointer;opacity:${opacity};box-shadow:0 1px 4px rgba(0,0,0,.08);overflow:hidden">
-      <div style="font-size:12px;font-weight:700;color:${col.text};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${st?st.name:'?'}</div>
-      ${heightPx>36?`<div style="font-size:11px;color:${col.text};opacity:.75">${LESSON_TYPES[l.type]||''} ${l.duration&&l.type!=='test'?' · '+l.duration+' יח':''}  </div>`:''}
-    </div>`;
-  });
-  let hoursHTML='';
-  for(let h=GRID_START;h<=GRID_END;h++){
-    const y=(h-GRID_START)*GRID_SLOT_H;
-    const isNow=isToday&&new Date().getHours()===h;
-    hoursHTML+=`<div style="position:absolute;right:0;width:58px;top:${y}px;font-size:11px;text-align:left;padding-left:8px;color:${isNow?'var(--er)':'var(--t3)'};font-weight:${isNow?700:400}">${String(h).padStart(2,'0')}:00</div>
-    <div style="position:absolute;right:62px;left:0;top:${y}px;border-top:1px solid var(--bd);opacity:.6"></div>`;
-  }
-  let nowLine='';
-  if(isToday){
-    const now=new Date();
-    const np=((now.getHours()-GRID_START)*60+now.getMinutes())/60*GRID_SLOT_H;
-    if(np>=0&&np<=totalH) nowLine=`<div style="position:absolute;right:62px;left:0;top:${np}px;border-top:2px solid var(--er);z-index:5"><div style="position:absolute;right:-5px;top:-4px;width:8px;height:8px;border-radius:50%;background:var(--er)"></div></div>`;
-  }
-  return `<div style="padding:10px 16px 0">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <button class="cal-nav" onclick="calDayPrev()">&#x203A;</button>
-      <span style="font-size:14px;font-weight:700;color:${isToday?'var(--p)':'var(--t1)'}">${dateLabel}</span>
-      <button class="cal-nav" onclick="calDayNext()">&#x2039;</button>
-    </div>
-    ${ls.length===0?'<div style="font-size:12px;color:var(--t3);text-align:center;padding:4px 0 8px">אין שיעורים — לחץ + להוספה</div>':''}
-  </div>
-  <div style="position:relative;margin:0 16px;height:${totalH+GRID_SLOT_H/2}px">${hoursHTML}${nowLine}${blocksHTML}</div>
-  <div style="height:90px"></div>
-  <button class="fab" onclick="showAddLesson()">+</button>`;
-}
-
-function renderCalendar(){
-  const view=S.calView||'month';
-  const segHTML=`<div class="seg" style="margin:10px 16px 0"><button class="seg-btn ${view==='month'?'active':''}" onclick="setCalView('month')">חודש</button><button class="seg-btn ${view==='week'?'active':''}" onclick="setCalView('week')">שבוע</button><button class="seg-btn ${view==='day'?'active':''}" onclick="setCalView('day')">יום</button><button class="seg-btn ${view==='grid'?'active':''}" onclick="setCalView('grid')">גריד</button></div>`;
-  if(view==='month') return segHTML+renderCalMonth();
-  if(view==='week')  return segHTML+renderCalWeek();
-  if(view==='grid')  return segHTML+renderCalGrid();
-  return segHTML+renderCalDay();
-}
-
-function toggleDark(){
-  document.body.classList.toggle('dark');
-  localStorage.setItem('dark',document.body.classList.contains('dark')?'1':'0');
-  renderContent();
-}
-
-if(localStorage.getItem('dark')==='1') document.body.classList.add('dark');
-
-// ── אתחול האפליקציה ──
-dbLoad();
-navigate('dashboard');
-</script>
-</body>
-</html>
+      <div style="font-size:13px;color:var(--t2)">${st?st.name:'?
