@@ -251,37 +251,59 @@ body.dark .srch input{background:var(--sf);color:var(--t1)}
 body.dark #bottom-nav{background:var(--sf)}
 body.dark .chk-box{border-color:#64748B}
 body.dark .chk-box.checked{border-color:var(--ok)}
-/* טקסטים כלליים */
-body.dark,body.dark *{color:var(--t1)}
-body.dark .t2,.dark .ir-l,.dark .pi-m,.dark .db-bl,.dark .note-date,.dark .test-res,.dark .lt-d,.dark .li-m{color:var(--t2)!important}
-body.dark .t3,.dark .tm,.dark .cal-day-num{color:var(--t3)!important}
+/* טקסטים — כל הטקסט לבן במצב לילה */
+body.dark .ir-l{color:var(--t2)}
+body.dark .ir-v{color:var(--t1);font-weight:700}
+body.dark .sn, body.dark .sm, body.dark .li-n, body.dark .pi-n{color:var(--t1)}
+body.dark .pi-d, body.dark .pi-m, body.dark .lt-d, body.dark .li-m{color:var(--t2)}
+body.dark .db-bl, body.dark .note-date, body.dark .test-res{color:var(--t2)}
+body.dark .cal-day-num{color:var(--t1)}
+body.dark .chk-lbl{color:var(--t1);font-weight:600}
+body.dark .chk-price{color:var(--t2)}
+body.dark .text-sm{color:var(--t2)}
+body.dark .alert-txt{color:var(--t1)}
+body.dark .empty-t{color:var(--t1)}
+body.dark .empty-d{color:var(--t2)}
 /* כרטיסים ורקעים */
-body.dark .card,.dark .lc,.dark .sc,.dark .pi-row,.dark .test-row{background:var(--sf);border-color:var(--bd)}
+body.dark .card{background:var(--sf);border-color:var(--bd)}
+body.dark .lc{background:var(--sf)}
+body.dark .sc{background:var(--sf)}
+body.dark .test-row{background:var(--sf);border-color:var(--bd)}
 body.dark .note-c{background:#1C2A1C;border-color:#365314}
-/* שורות מידע במודל */
+body.dark .note-txt{color:var(--t1)}
+/* שורות מידע */
 body.dark .ir{border-color:var(--bd)}
-body.dark .ir-v{color:var(--t1)!important;font-weight:700}
 /* כותרות חלקים */
 body.dark .sh{border-color:var(--bd)}
-body.dark .st{color:var(--t1)!important;font-weight:700}
-/* כפתורי ניווט */
+body.dark .st{color:var(--t1);font-weight:700}
+/* כפתורי ניווט תחתון */
 body.dark .nav-item span:last-child{color:var(--t3)}
 body.dark .nav-item.active span:last-child{color:var(--p)}
 /* שדות טופס */
-body.dark .fl{color:var(--t2)!important}
+body.dark .fl{color:var(--t2)}
 body.dark select.fi{background:#0F172A;color:var(--t1)}
 body.dark textarea.fi{background:#0F172A;color:var(--t1)}
 /* כותרת עמוד */
-body.dark .hdr-title{color:var(--t1)!important;font-weight:700}
+body.dark .hdr-title{color:var(--t1);font-weight:700}
 /* לוח שנה */
-body.dark .cal-mon{color:var(--t1)!important;font-weight:700}
+body.dark .cal-mon{color:var(--t1);font-weight:700}
 body.dark .seg{background:var(--bd)}
 body.dark .seg-btn{color:var(--t2)}
 body.dark .seg-btn.active{background:var(--sf);color:var(--p)}
 /* תגיות */
 body.dark .badge{font-weight:700}
-/* אלרטים */
-body.dark .alert-txt{color:var(--t1)!important}
+/* כותרת תלמיד */
+body.dark .sdh-lbl{color:rgba(255,255,255,.7)}
+body.dark .sdh-val{color:white;font-weight:700}
+/* כרטיסי שיעורים */
+body.dark .lt-t{color:var(--t1);font-weight:700}
+/* טאבים */
+body.dark .tab{color:var(--t2)}
+body.dark .tab.active{color:var(--p)}
+/* צ'קליסט */
+body.dark .chk-row{border-color:var(--bd)}
+/* כפתורי ניווט לוח שנה */
+body.dark .cal-nav{color:var(--t1)}
 </style>
 </head>
 <body>
@@ -575,7 +597,7 @@ function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(
 function fmtCur(n){ if(!n&&n!==0)return '₪0'; return '₪'+Math.abs(n).toLocaleString('he-IL'); }
 function fmtDate(d){ if(!d)return ''; const dt=new Date(d); return `${dt.getDate()} ${HE_MONTHS[dt.getMonth()]} ${dt.getFullYear()}`; }
 function fmtDateShort(d){ if(!d)return ''; const dt=new Date(d); return `${dt.getDate()}/${dt.getMonth()+1}/${String(dt.getFullYear()).slice(2)}`; }
-function initials(n){ if(!n)return '?'; const p=n.trim().split(' '); return p.length>=2?p[0][0]+p[1][0]:p[0].slice(0,2); }
+function initials(n){ if(!n)return '?'; const p=n.trim().split(' ').filter(x=>x.length>0); return p.length>=2?p[0][0]+p[1][0]:p[0].slice(0,2); }
 function avaColor(name){ let h=0; for(let c of name||'')h=(h*31+c.charCodeAt(0))%AVA_COLORS.length; return AVA_COLORS[h]; }
 function calcAge(dob){ if(!dob)return null; const b=new Date(dob),now=new Date(); let y=now.getFullYear()-b.getFullYear(),m=now.getMonth()-b.getMonth(); if(m<0||(m===0&&now.getDate()<b.getDate()))y--; return y; }
 function calcAgeMonths(dob){ if(!dob)return null; const b=new Date(dob),now=new Date(); return (now.getFullYear()-b.getFullYear())*12+(now.getMonth()-b.getMonth())+(now.getDate()>=b.getDate()?0:-1); }
@@ -806,7 +828,7 @@ function renderStudentDetail(){
   const s=S.students.find(x=>x.id===S.selStudent);
   if(!s) return '<div class="empty"><div class="empty-t">תלמיד לא נמצא</div></div>';
   const bal=calcBalance(s.id);
-  const lessons=S.lessons.filter(l=>l.studentId===s.id).sort((a,b)=>b.date.localeCompare(a.date)||b.time.localeCompare(a.time));
+  const lessons=S.lessons.filter(l=>l.studentId===s.id).sort((a,b)=>b.date.localeCompare(a.date)||((b.time||'').localeCompare(a.time||'')));
   const done=lessons.filter(l=>l.status==='done'&&l.type==='lesson').length;
   const payments=S.payments.filter(p=>p.studentId===s.id).sort((a,b)=>b.date.localeCompare(a.date));
   const tests=lessons.filter(l=>l.type==='test').sort((a,b)=>a.date.localeCompare(b.date));
