@@ -251,6 +251,37 @@ body.dark .srch input{background:var(--sf);color:var(--t1)}
 body.dark #bottom-nav{background:var(--sf)}
 body.dark .chk-box{border-color:#64748B}
 body.dark .chk-box.checked{border-color:var(--ok)}
+/* טקסטים כלליים */
+body.dark,body.dark *{color:var(--t1)}
+body.dark .t2,.dark .ir-l,.dark .pi-m,.dark .db-bl,.dark .note-date,.dark .test-res,.dark .lt-d,.dark .li-m{color:var(--t2)!important}
+body.dark .t3,.dark .tm,.dark .cal-day-num{color:var(--t3)!important}
+/* כרטיסים ורקעים */
+body.dark .card,.dark .lc,.dark .sc,.dark .pi-row,.dark .test-row{background:var(--sf);border-color:var(--bd)}
+body.dark .note-c{background:#1C2A1C;border-color:#365314}
+/* שורות מידע במודל */
+body.dark .ir{border-color:var(--bd)}
+body.dark .ir-v{color:var(--t1)!important;font-weight:700}
+/* כותרות חלקים */
+body.dark .sh{border-color:var(--bd)}
+body.dark .st{color:var(--t1)!important;font-weight:700}
+/* כפתורי ניווט */
+body.dark .nav-item span:last-child{color:var(--t3)}
+body.dark .nav-item.active span:last-child{color:var(--p)}
+/* שדות טופס */
+body.dark .fl{color:var(--t2)!important}
+body.dark select.fi{background:#0F172A;color:var(--t1)}
+body.dark textarea.fi{background:#0F172A;color:var(--t1)}
+/* כותרת עמוד */
+body.dark .hdr-title{color:var(--t1)!important;font-weight:700}
+/* לוח שנה */
+body.dark .cal-mon{color:var(--t1)!important;font-weight:700}
+body.dark .seg{background:var(--bd)}
+body.dark .seg-btn{color:var(--t2)}
+body.dark .seg-btn.active{background:var(--sf);color:var(--p)}
+/* תגיות */
+body.dark .badge{font-weight:700}
+/* אלרטים */
+body.dark .alert-txt{color:var(--t1)!important}
 </style>
 </head>
 <body>
@@ -1385,7 +1416,7 @@ function openLesson(id){
       <div class="ir"><span class="ir-l">שעה</span><span class="ir-v">${l.time||'—'}</span></div>
       <div class="ir"><span class="ir-l">סוג</span><span class="ir-v">${LESSON_TYPES[l.type]||l.type}</span></div>
       <div class="ir"><span class="ir-l">${l.type==='test'?'מחיר':'יחידות'}</span><span class="ir-v">${l.type==='test'?'₪230':l.duration||1}</span></div>
-      <div class="ir"><span class="ir-l">סטטוס</span><span class="badge ${l.status==='done'?'bg':l.status==='cancelled'?'br':'by'}">${LESSON_STATUS[l.status]||l.status}</span></div>
+      <div class="ir"><span class="ir-l">סטטוס</span><span class="badge ${l.status==='done'?'bg':l.status==='cancelled'?'br':'by'}">${LESSON_STATUS[l.status]||LESSON_STATUS['scheduled']}</span></div>
       ${l.notes?`<div class="ir"><span class="ir-l">הערות</span><span class="ir-v">${l.notes}</span></div>`:''}
     </div>
     <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:6px">שנה סטטוס:</div>
