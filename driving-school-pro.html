@@ -1412,6 +1412,53 @@ function showAddLesson(studentId=null, defaultType='lesson'){
   <div style="height:8px"></div>`);
 }
 
+// ─── הוספת תשלום ───────────────────────────────
+function showAddPayment(studentId=null){
+  const students=S.students.filter(s=>s.status==='active').sort((a,b)=>a.name.localeCompare(b.name,'he'));
+  openModal(`
+  <div class="m-handle"></div>
+  <div class="m-hdr"><span class="m-title">רישום תשלום</span><button class="m-close" onclick="closeModal()">×</button></div>
+  <div class="m-body">
+    <div class="fg"><label class="fl">תלמיד *</label>
+      <select class="fi fsel" id="f-psid">
+        <option value="">-- בחר תלמיד --</option>
+        ${students.map(s=>`<option value="${s.id}" ${s.id===studentId?'selected':''}>${s.name}</option>`).join('')}
+      </select>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">סכום (₪) *</label><input class="fi" id="f-pamt" type="number" min="0" step="10" placeholder="0"></div>
+      <div class="fg"><label class="fl">תאריך *</label><input class="fi" id="f-pdate" type="date" value="${todayStr()}"></div>
+    </div>
+    <div class="fg"><label class="fl">אמצעי תשלום</label>
+      <select class="fi fsel" id="f-pmeth">
+        <option value="cash">מזומן</option>
+        <option value="transfer">העברה בנקאית</option>
+        <option value="bit">Bit</option>
+        <option value="check">צ'ק</option>
+      </select>
+    </div>
+    <div class="fg"><label class="fl">הערה / אסמכתא</label><input class="fi" id="f-pnotes" type="text" placeholder="מספר צ'ק, הערה..."></div>
+  </div>
+  <div class="m-foot"><button class="btn btn-o" onclick="closeModal()">ביטול</button><button class="btn btn-p" style="flex:1" onclick="savePayment()">שמור תשלום</button></div>
+  <div style="height:8px"></div>`);
+}
+
+function savePayment(){
+  const sid=document.getElementById('f-psid')?.value;
+  const amt=parseFloat(document.getElementById('f-pamt')?.value);
+  const date=document.getElementById('f-pdate')?.value;
+  const method=document.getElementById('f-pmeth')?.value;
+  const notes=document.getElementById('f-pnotes')?.value;
+  if(!sid){toast('יש לבחור תלמיד','err');return;}
+  if(!amt||amt<=0){toast('יש להזין סכום','err');return;}
+  if(!date){toast('יש להזין תאריך','err');return;}
+  const payment={id:uid(),studentId:sid,amount:amt,date,method,notes:notes||null};
+  dbPayment(payment);
+  closeModal();
+  toast('תשלום נרשם ✅','ok');
+  renderContent();
+}
+
 function saveLesson(id){
   const sid=document.getElementById('f-lstudent')?.value;
   const date=document.getElementById('f-ldate')?.value;
