@@ -434,10 +434,30 @@ const S = {
 // DATABASE — localStorage + Google Sheets sync
 // ═══════════════════════════════════════════════
 
+// ── ניקוי נתוני Sheets — שעה ותאריך ──
+function cleanTime(t){
+  if(!t) return '';
+  const s = String(t);
+  const m = s.match(/T(\d{2}:\d{2})/);   // 1899-12-30T06:39:20.000Z → 06:39
+  if(m) return m[1];
+  if(/^\d{2}:\d{2}:\d{2}/.test(s)) return s.substring(0,5);  // HH:MM:SS → HH:MM
+  if(/^\d{1,2}:\d{2}$/.test(s)) return s.padStart(5,'0');      // H:MM → HH:MM
+  return s;
+}
+function cleanLesson(l){
+  if(!l) return l;
+  return {
+    ...l,
+    time:   cleanTime(l.time),
+    status: (!l.status || l.status==='null') ? 'scheduled' : l.status,
+    date:   l.date ? String(l.date).split('T')[0] : l.date
+  };
+}
+
 // קריאה מקומית (מהירה)
 function dbLoad(){
   S.students = JSON.parse(localStorage.getItem('dp_s')||'[]');
-  S.lessons  = JSON.parse(localStorage.getItem('dp_l')||'[]');
+  S.lessons  = (JSON.parse(localStorage.getItem('dp_l')||'[]')).map(cleanLesson);
   S.payments = JSON.parse(localStorage.getItem('dp_p')||'[]');
 }
 
@@ -469,7 +489,7 @@ async function apiLoadAll(){
     const json = await res.json();
     if(json.ok && json.data){
       S.students = json.data.students || [];
-      S.lessons  = json.data.lessons  || [];
+      S.lessons  = (json.data.lessons  || []).map(cleanLesson);
       S.payments = json.data.payments || [];
       dbSave(); // cache locally
       return true;
@@ -529,7 +549,8 @@ function avaColor(name){ let h=0; for(let c of name||'')h=(h*31+c.charCodeAt(0))
 function calcAge(dob){ if(!dob)return null; const b=new Date(dob),now=new Date(); let y=now.getFullYear()-b.getFullYear(),m=now.getMonth()-b.getMonth(); if(m<0||(m===0&&now.getDate()<b.getDate()))y--; return y; }
 function calcAgeMonths(dob){ if(!dob)return null; const b=new Date(dob),now=new Date(); return (now.getFullYear()-b.getFullYear())*12+(now.getMonth()-b.getMonth())+(now.getDate()>=b.getDate()?0:-1); }
 function isMinAge(dob){ return calcAgeMonths(dob)>=(16*12+6); }
-function todayStr(){ return new Date().toISOString().split('T')[0]; }
+function localStr(d){ return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function todayStr(){ return localStr(new Date()); }
 function isSameDay(d1,d2){ const a=new Date(d1),b=new Date(d2); return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate(); }
 
 // Israeli ID validation
@@ -956,7 +977,7 @@ function renderCalWeek(){
   const today=new Date(); const todayStr2=todayStr();
   const dayNames=['א','ב','ג','ד','ה','ו','ש'];
   const headerHTML=days.map((day,i)=>{
-    const ds=day.toISOString().split('T')[0];
+    const ds=localStr(day);
     const isToday=ds===todayStr2;
     const hasL=S.lessons.some(l=>l.date===ds);
     const isSel=S.calSel&&`${S.calSel.y}-${String(S.calSel.m+1).padStart(2,'0')}-${String(S.calSel.d).padStart(2,'0')}`===ds;
@@ -989,7 +1010,7 @@ function renderCalDay(){
   const d=S.calDate; const today2=new Date();
   const days=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
   const dateStr=`${d.getDate()} ${HE_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-  const ds=d.toISOString().split('T')[0];
+  const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   const ls=S.lessons.filter(l=>l.date===ds).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
   return `
   <div class="cal-hdr" style="padding:10px 16px">
@@ -1453,7 +1474,7 @@ function copyLesson(id){
   closeModal();
   const nextDay=new Date(l.date);
   nextDay.setDate(nextDay.getDate()+1);
-  const nextDate=nextDay.toISOString().split('T')[0];
+  const nextDate=localStr(nextDay);
   const students=S.students.filter(s=>s.status==='active').sort((a,b)=>a.name.localeCompare(b.name,'he'));
   openModal(`
   <div class="m-handle"></div>
@@ -1567,7 +1588,7 @@ const LESSON_COLORS={
 
 function renderCalGrid(){
   const d=S.calDate;
-  const ds=d.toISOString().split('T')[0];
+  const ds=localStr(d);
   const today2=todayStr();
   const isToday=ds===today2;
   const dayNames=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
