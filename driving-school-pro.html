@@ -515,9 +515,10 @@ function cleanLesson(l){
   if(!l) return l;
   return {
     ...l,
-    time:   cleanTime(l.time),
-    status: (!l.status || l.status==='null') ? 'scheduled' : l.status,
-    date:   l.date ? String(l.date).split('T')[0] : l.date
+    time:     cleanTime(l.time),
+    status:   (!l.status || l.status==='null') ? 'scheduled' : l.status,
+    date:     l.date ? String(l.date).split('T')[0] : l.date,
+    duration: l.duration != null ? parseFloat(l.duration) || 1 : 1
   };
 }
 
@@ -895,16 +896,11 @@ function renderStudentDetail(){
       <div class="ir" style="border-top:2px solid var(--bd);margin-top:4px;padding-top:8px"><span class="ir-l fw8" style="font-size:15px">יתרת חוב</span><span class="ir-v fw8 ${bal.debt>0?'tr':bal.debt<0?'tc':'tm'}" style="font-size:16px">${bal.debt>0?fmtCur(bal.debt):bal.debt<0?'זכות '+fmtCur(-bal.debt):'מסולק ✅'}</span></div>
     </div>
     ${s.status==='archived'?`
-    <div class="m-foot" style="padding:16px">
-      <button class="btn btn-p btn-full" onclick="showImportHistory('${s.id}')">📥 ייבוא נתוני עבר</button>
-    </div>
-    <div style="padding:0 16px 8px">
-      <button class="btn btn-o btn-full" onclick="restoreStudent('${s.id}')">↩️ החזר לפעיל</button>
-    </div>`:`
-    <div class="m-foot" style="padding:16px">
-      <button class="btn btn-p btn-full" onclick="showAddPayment('${s.id}')">➕ רשום תשלום</button>
-      <button class="btn btn-g" onclick="showAddLesson('${s.id}')">+ שיעור</button>
-    </div>`}`;
+    <div style="height:110px"></div>
+    <button class="fab-wide" style="bottom:calc(var(--nh) + var(--sb) + 70px)" onclick="showImportHistory('${s.id}')">📥 ייבוא נתוני עבר</button>
+    <button class="fab-wide" style="background:var(--t3);bottom:calc(var(--nh) + var(--sb) + 16px)" onclick="restoreStudent('${s.id}')">↩️ החזר לפעיל</button>`:`
+    <div style="height:80px"></div>
+    <button class="fab-wide" onclick="showAddPayment('${s.id}')">➕ רשום תשלום</button>`}`;
   } else if(S.detailTab==='lessons'){
     const lessonHTML=lessons.length===0?`<div class="empty"><div class="empty-ico">📚</div><div class="empty-t">אין שיעורים עדיין</div></div>`:
       `<div class="card" style="margin:12px 16px">${lessons.map(l=>`
@@ -920,9 +916,9 @@ function renderStudentDetail(){
   } else if(S.detailTab==='payments'){
     const payHTML=payments.length===0?`<div class="empty"><div class="empty-ico">💰</div><div class="empty-t">אין תשלומים</div></div>`:
       `<div class="card" style="margin:12px 16px">${payments.map(p=>`
-      <div class="pi">
+      <div class="pi" onclick="openPayment('${p.id}')" style="cursor:pointer">
         <div class="pi-ico pi-in">💵</div>
-        <div class="pi-info"><div class="pi-n">${fmtDate(p.date)}</div><div class="pi-d">${p.method||''} ${p.notes?'· '+p.notes:''}</div></div>
+        <div class="pi-info"><div class="pi-n">${fmtDate(p.date)}${p.receiptNum?' <span style=\"font-size:10px;color:var(--pr);font-weight:600\">קבלה #'+p.receiptNum+'</span>':''}</div><div class="pi-d">${p.method||''} ${p.notes?'· '+p.notes:''}</div></div>
         <div class="pi-amt pi-pos">${fmtCur(p.amount)}</div>
       </div>`).join('')}</div>`;
     const summary=`<div class="card cp" style="margin:12px 16px">
@@ -955,6 +951,7 @@ function renderStudentDetail(){
   <div class="sdh" style="background:linear-gradient(135deg,${avaColor(s.name)},${avaColor(s.name+'x')})">
     <div class="sdh-ava">${initials(s.name)}</div>
     <div class="sdh-name">${s.name}</div>
+    ${s.notes?`<div style="font-size:12px;opacity:.75;margin-bottom:2px;margin-top:-2px">${s.notes}</div>`:''}
     <div class="tag-row">
       <span class="badge" style="background:rgba(255,255,255,.2);color:white">${pkg?.name}</span>
       ${bal.debt>0?`<span class="badge br">חוב ${fmtCur(bal.debt)}</span>`:`<span class="badge bg">מסולק ✅</span>`}
@@ -1141,7 +1138,7 @@ function lessonCard(l){
   const st=S.students.find(s=>s.id===l.studentId);
   const stIco={done:'✅',cancelled:'❌',noshow:'⚠️',scheduled:'🕐'};
   return `<div class="lc" onclick="openLesson('${l.id}')">
-    <div class="lt"><div class="lt-t">${l.time||'--:--'}</div><div class="lt-d">${l.type==='test'?'₪230':l.duration+' יח\''}</div></div>
+    <div class="lt"><div class="lt-t">${l.time||'--:--'}</div><div class="lt-d">${l.type==='test'?'₪230':(+l.duration||1)+' יח\''}</div></div>
     <div class="li"><div class="li-n">${st?st.name:'?'}</div>
     <div class="li-m"><span class="badge bgr">${LESSON_TYPES[l.type]||l.type}</span></div></div>
     <div class="ls">${stIco[l.status]||'🕐'}</div>
@@ -1180,10 +1177,10 @@ function renderPayments(){
   const payHTML=recent.length===0?`<div class="empty"><div class="empty-ico">💸</div><div class="empty-t">אין תשלומים עדיין</div></div>`:
     `<div class="card" style="margin:0 16px">${recent.map(p=>{
       const st=S.students.find(s=>s.id===p.studentId);
-      return `<div class="pi">
+      return `<div class="pi" onclick="openPayment('${p.id}')" style="cursor:pointer">
         <div class="pi-ico pi-in">💵</div>
-        <div class="pi-info"><div class="pi-n">${st?st.name:'?'}</div><div class="pi-d">${fmtDate(p.date)} · ${p.method||'מזומן'}</div></div>
-        <div class="pi-amt pi-pos">${fmtCur(p.amount)}</div>
+        <div class="pi-info"><div class="pi-n">${st?st.name:'?'}${p.receiptNum?` <span style="font-size:10px;color:var(--pr);font-weight:600">קבלה #${p.receiptNum}</span>`:''}</div><div class="pi-d">${fmtDate(p.date)} · ${p.method||'מזומן'}</div></div>
+        <div style="display:flex;align-items:center;gap:6px"><div class="pi-amt pi-pos">${fmtCur(p.amount)}</div><span style="color:var(--t3);font-size:16px">›</span></div>
       </div>`;
     }).join('')}</div>`;
 
@@ -1492,7 +1489,10 @@ function showAddPayment(studentId=null){
         <option value="check">צ'ק</option>
       </select>
     </div>
-    <div class="fg"><label class="fl">הערה / אסמכתא</label><input class="fi" id="f-pnotes" type="text" placeholder="מספר צ'ק, הערה..."></div>
+    <div class="frow">
+      <div class="fg"><label class="fl">מס' קבלה</label><input class="fi" id="f-preceipt" type="text" placeholder="מס' קבלה..."></div>
+      <div class="fg"><label class="fl">הערה / אסמכתא</label><input class="fi" id="f-pnotes" type="text" placeholder="מספר צ'ק, הערה..."></div>
+    </div>
   </div>
   <div class="m-foot"><button class="btn btn-o" onclick="closeModal()">ביטול</button><button class="btn btn-p" style="flex:1" onclick="savePayment()">שמור תשלום</button></div>
   <div style="height:8px"></div>`);
@@ -1507,7 +1507,8 @@ function savePayment(){
   if(!sid){toast('יש לבחור תלמיד','err');return;}
   if(!amt||amt<=0){toast('יש להזין סכום','err');return;}
   if(!date){toast('יש להזין תאריך','err');return;}
-  const payment={id:uid(),studentId:sid,amount:amt,date,method,notes:notes||null};
+  const receiptNum=document.getElementById('f-preceipt')?.value||null;
+  const payment={id:uid(),studentId:sid,amount:amt,date,method,notes:notes||null,receiptNum:receiptNum||null};
   dbPayment(payment);
   closeModal();
   toast('תשלום נרשם ✅','ok');
@@ -1544,7 +1545,7 @@ function openLesson(id){
       <div class="ir"><span class="ir-l">תאריך</span><span class="ir-v">${fmtDate(l.date)}</span></div>
       <div class="ir"><span class="ir-l">שעה</span><span class="ir-v">${l.time||'—'}</span></div>
       <div class="ir"><span class="ir-l">סוג</span><span class="ir-v">${LESSON_TYPES[l.type]||l.type}</span></div>
-      <div class="ir"><span class="ir-l">${l.type==='test'?'מחיר':'יחידות'}</span><span class="ir-v">${l.type==='test'?'₪230':l.duration||1}</span></div>
+      <div class="ir"><span class="ir-l">${l.type==='test'?'מחיר':'יחידות'}</span><span class="ir-v">${l.type==='test'?'₪230':(+l.duration||1)}</span></div>
       <div class="ir"><span class="ir-l">סטטוס</span><span class="badge ${l.status==='done'?'bg':l.status==='cancelled'?'br':'by'}">${LESSON_STATUS[l.status]||LESSON_STATUS['scheduled']}</span></div>
       ${l.notes?`<div class="ir"><span class="ir-l">הערות</span><span class="ir-v">${l.notes}</span></div>`:''}
     </div>
@@ -1930,6 +1931,114 @@ function quickStatus(id, status){
   dbLesson(l);
   // refresh the modal
   showPastScheduled();
+}
+
+
+// ════════════════════════════════════════════════
+// PAYMENT MODAL — פרטי תשלום, עריכה, מחיקה
+// ════════════════════════════════════════════════
+function openPayment(id){
+  const p=S.payments.find(x=>x.id===id);
+  if(!p)return;
+  const st=S.students.find(s=>s.id===p.studentId);
+  const methods={cash:'מזומן',transfer:'העברה בנקאית',bit:'Bit',check:"צ'ק"};
+  openModal(`
+  <div class="m-handle"></div>
+  <div class="m-hdr"><span class="m-title">💵 פרטי תשלום</span><button class="m-close" onclick="closeModal()">×</button></div>
+  <div class="m-body">
+    <div class="card cp mb12">
+      <div class="ir"><span class="ir-l">תלמיד</span><span class="ir-v">${st?st.name:'?'}</span></div>
+      <div class="ir"><span class="ir-l">סכום</span><span class="ir-v pi-pos fw7">${fmtCur(p.amount)}</span></div>
+      <div class="ir"><span class="ir-l">תאריך</span><span class="ir-v">${fmtDate(p.date)}</span></div>
+      <div class="ir"><span class="ir-l">אמצעי תשלום</span><span class="ir-v">${methods[p.method]||p.method||'מזומן'}</span></div>
+      ${p.receiptNum?`<div class="ir"><span class="ir-l">מס' קבלה</span><span class="ir-v fw7 " style="color:var(--pr)">${p.receiptNum}</span></div>`:''}
+      ${p.notes?`<div class="ir"><span class="ir-l">הערה</span><span class="ir-v">${p.notes}</span></div>`:''}
+    </div>
+  </div>
+  <div class="m-foot">
+    <button class="btn btn-d" onclick="deletePayment('${id}')">🗑️</button>
+    <button class="btn btn-o" style="flex:1" onclick="editPayment('${id}')">✏️ עריכה</button>
+    <button class="btn btn-p" style="flex:1" onclick="closeModal()">סגור</button>
+  </div>
+  <div style="height:8px"></div>`);
+}
+
+function editPayment(id){
+  const p=S.payments.find(x=>x.id===id);
+  if(!p)return;
+  const st=S.students.find(s=>s.id===p.studentId);
+  closeModal();
+  openModal(`
+  <div class="m-handle"></div>
+  <div class="m-hdr"><span class="m-title">✏️ עריכת תשלום</span><button class="m-close" onclick="closeModal()">×</button></div>
+  <div class="m-body">
+    <div class="fg"><label class="fl">תלמיד</label>
+      <div class="fi" style="background:var(--bg);color:var(--t2)">${st?st.name:'?'}</div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">סכום (₪) *</label><input class="fi" id="f-pamt" type="number" min="0" step="10" value="${p.amount}"></div>
+      <div class="fg"><label class="fl">תאריך *</label><input class="fi" id="f-pdate" type="date" value="${p.date}"></div>
+    </div>
+    <div class="fg"><label class="fl">אמצעי תשלום</label>
+      <select class="fi fsel" id="f-pmeth">
+        <option value="cash" ${p.method==='cash'?'selected':''}>מזומן</option>
+        <option value="transfer" ${p.method==='transfer'?'selected':''}>העברה בנקאית</option>
+        <option value="bit" ${p.method==='bit'?'selected':''}>Bit</option>
+        <option value="check" ${p.method==='check'?'selected':''}>צ'ק</option>
+      </select>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">מס' קבלה</label><input class="fi" id="f-preceipt" type="text" value="${p.receiptNum||''}" placeholder="מס' קבלה..."></div>
+      <div class="fg"><label class="fl">הערה / אסמכתא</label><input class="fi" id="f-pnotes" type="text" value="${p.notes||''}" placeholder="מספר צ'ק, הערה..."></div>
+    </div>
+  </div>
+  <div class="m-foot">
+    <button class="btn btn-o" onclick="closeModal()">ביטול</button>
+    <button class="btn btn-p" style="flex:1" onclick="saveEditPayment('${id}')">שמור שינויים</button>
+  </div>
+  <div style="height:8px"></div>`);
+}
+
+function saveEditPayment(id){
+  const p=S.payments.find(x=>x.id===id);
+  if(!p)return;
+  const amt=parseFloat(document.getElementById('f-pamt')?.value);
+  const date=document.getElementById('f-pdate')?.value;
+  const method=document.getElementById('f-pmeth')?.value;
+  const notes=document.getElementById('f-pnotes')?.value;
+  if(!amt||amt<=0){toast('יש להזין סכום','err');return;}
+  if(!date){toast('יש להזין תאריך','err');return;}
+  const receiptNum=document.getElementById('f-preceipt')?.value||null;
+  p.amount=amt; p.date=date; p.method=method; p.notes=notes||null; p.receiptNum=receiptNum||null;
+  dbPayment(p);
+  closeModal();
+  toast('תשלום עודכן ✅','ok');
+  renderContent();
+}
+
+function deletePayment(id){
+  openModal(`
+  <div class="m-handle"></div>
+  <div class="m-hdr"><span class="m-title">מחיקת תשלום</span><button class="m-close" onclick="closeModal()">×</button></div>
+  <div class="m-body">
+    <div style="text-align:center;padding:16px 0 8px">
+      <div style="font-size:44px;margin-bottom:10px">🗑️</div>
+      <div style="font-size:16px;font-weight:700;color:var(--t1);margin-bottom:6px">למחוק את התשלום?</div>
+      <div style="font-size:12px;color:var(--er);margin-top:8px">לא ניתן לשחזר</div>
+    </div>
+  </div>
+  <div class="m-foot">
+    <button class="btn btn-o" onclick="closeModal()">ביטול</button>
+    <button class="btn btn-d" style="flex:1" onclick="confirmDeletePayment('${id}')">מחק תשלום</button>
+  </div>
+  <div style="height:8px"></div>`);
+}
+
+function confirmDeletePayment(id){
+  dbDelPayment(id);
+  closeModal();
+  toast('תשלום נמחק','ok');
+  renderContent();
 }
 
 document.addEventListener('DOMContentLoaded', appInit);
