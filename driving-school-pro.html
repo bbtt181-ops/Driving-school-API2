@@ -68,7 +68,7 @@ a{text-decoration:none;color:inherit}
 .btn:active{opacity:.8;transform:scale(.98)}
 .fab{position:fixed;bottom:calc(var(--nh) + var(--sb) + 16px);left:20px;width:56px;height:56px;border-radius:50%;background:var(--p);color:white;font-size:26px;box-shadow:var(--sh3);display:flex;align-items:center;justify-content:center;z-index:50;transition:transform .15s}
 .fab:active{transform:scale(.93)}
-.fab-wide{position:fixed;bottom:calc(var(--nh) + var(--sb) + 16px);left:16px;right:16px;height:52px;border-radius:26px;background:var(--p);color:white;font-size:15px;font-weight:700;box-shadow:var(--sh3);display:flex;align-items:center;justify-content:center;gap:6px;z-index:50;transition:transform .15s}
+.fab-wide{position:fixed;bottom:calc(var(--nh) + var(--sb) + 16px);right:20px;left:auto;width:auto;min-width:56px;height:56px;padding:0 20px;border-radius:28px;background:var(--p);color:white;font-size:15px;font-weight:700;box-shadow:var(--sh3);display:flex;align-items:center;justify-content:center;gap:6px;z-index:50;transition:transform .15s}
 .fab-wide:active{transform:scale(.98)}
 /* FORMS */
 .fg{margin-bottom:14px}
@@ -318,6 +318,7 @@ body.dark .st{color:var(--t1)}
 body.dark .btn-o{border-color:var(--bd);color:var(--t1)}
 body.dark .hdr-back{color:var(--t1)}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <div id="app">
@@ -1749,9 +1750,30 @@ function toggleDark(){
 // ════════════════════════════════════════════════
 // APP INIT
 // ════════════════════════════════════════════════
+// אוטומציה: שיעורים שעבר תאריכם → מתוכנן → בוצע
+function autoFixPastScheduled(){
+  const today=todayStr();
+  let changed=0;
+  S.lessons.forEach(l=>{
+    if(l.status==='scheduled' && l.date && l.date<today){
+      l.status='done';
+      changed++;
+    }
+  });
+  if(changed>0){
+    dbSave();
+    // סנכרן לשיטס ברקע
+    if(hasAPI()){
+      S.lessons.filter(l=>l.status==='done').forEach(l=>apiPost('save','lesson',l));
+    }
+    console.log('[AutoFix] '+changed+' שיעורים עודכנו לבוצע');
+  }
+}
+
 async function appInit(){
   if(localStorage.getItem('dp_dark')==='1') document.body.classList.add('dark');
   dbLoad();
+  autoFixPastScheduled();
   renderContent();
   if(hasAPI()){
     showSyncStatus('⟳ מסנכרן עם Sheets...');
@@ -1808,9 +1830,18 @@ function showImportHistory(sid){
       </div>
     </div>
   </div>
-  <div class="m-foot">
-    <button class="btn btn-o" onclick="closeModal()">ביטול</button>
-    <button class="btn btn-p" style="flex:1" onclick="saveImportHistory('${sid}')">שמור נתונים</button>
+  </div>
+  <div class="m-foot" style="flex-direction:column;gap:8px">
+    <div style="display:flex;gap:8px;width:100%">
+      <button class="btn btn-o" onclick="closeModal()">ביטול</button>
+      <button class="btn btn-p" style="flex:1" onclick="saveImportHistory('${sid}')">💾 שמור נתונים</button>
+    </div>
+    <label style="width:100%;cursor:pointer">
+      <div class="btn btn-w" style="width:100%;text-align:center;box-sizing:border-box">
+        📊 ייבא מקובץ Excel
+      </div>
+      <input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExcelHistory('${sid}',this)">
+    </label>
   </div>
   <div style="height:8px"></div>`);
 }
@@ -1849,6 +1880,134 @@ function saveImportHistory(sid){
   toast('נתוני עבר נשמרו ✅','ok');
   renderContent();
 }
+
+// ════════════════════════════════════════════════
+// EXCEL IMPORT — ייבוא מקובץ Excel
+// ════════════════════════════════════════════════
+// פורמט עמודות מצופה (שם עמודה בשורה ראשונה, בעברית/אנגלית):
+// תאריך/date | יחידות/units | סוג/type | תשלום/payment | קבלה/receipt | הערה/notes
+function importExcelHistory(sid, input){
+  const s=S.students.find(x=>x.id===sid);
+  if(!s||!input.files[0])return;
+  const file=input.files[0];
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const data=new Uint8Array(e.target.result);
+      const wb=XLSX.read(data,{type:'array',cellDates:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+      if(!rows.length){toast('הקובץ ריק או לא נקרא','err');return;}
+
+      // Map column headers (flexible - Hebrew or English)
+      const norm=k=>String(k).trim().toLowerCase()
+        .replace('תאריך','date').replace('יחידות','units').replace('duration','units')
+        .replace('סוג','type').replace('תשלום','payment').replace('amount','payment')
+        .replace('קבלה','receipt').replace('הערה','notes').replace('note','notes');
+
+      const parsed=rows.map(row=>{
+        const r={};
+        Object.keys(row).forEach(k=>{r[norm(k)]=row[k];});
+        // Parse date
+        let d=r.date||r['תאריך']||'';
+        if(d instanceof Date){
+          d=d.toISOString().split('T')[0];
+        } else {
+          d=String(d).trim();
+          // Handle DD/MM/YYYY
+          if(/\d{1,2}\/\d{1,2}\/\d{4}/.test(d)){
+            const p=d.split('/');
+            d=p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0');
+          }
+        }
+        const units=parseFloat(r.units)||0;
+        const typeRaw=String(r.type||'').trim();
+        const type=typeRaw==='טסט'||typeRaw==='test'?'test':
+                   typeRaw==='פנימי'||typeRaw==='internal'?'internal':'lesson';
+        const payment=parseFloat(r.payment)||0;
+        const receipt=String(r.receipt||'').trim();
+        const notes=String(r.notes||'').trim();
+        return {date:d,units,type,payment,receipt,notes};
+      }).filter(r=>r.date&&r.date.length===10&&(r.units>0||r.payment>0));
+
+      if(!parsed.length){
+        toast('לא נמצאו שורות תקינות. ודא שיש עמודות: תאריך, יחידות, תשלום','err');
+        return;
+      }
+
+      // Show preview
+      const lessons=parsed.filter(r=>r.units>0);
+      const payments=parsed.filter(r=>r.payment>0);
+      const totalUnits=lessons.reduce((a,r)=>a+r.units,0);
+      const totalPaid=payments.reduce((a,r)=>a+r.payment,0);
+
+      closeModal();
+      openModal(`
+      <div class="m-handle"></div>
+      <div class="m-hdr"><span class="m-title">📊 תצוגה מקדימה — ייבוא</span><button class="m-close" onclick="closeModal()">×</button></div>
+      <div class="m-body" style="max-height:60vh;overflow-y:auto">
+        <div style="padding:8px 0 12px;font-size:13px;color:var(--t2)">
+          נמצאו <b style="color:var(--t1)">${parsed.length} שורות</b> עבור <b style="color:var(--p)">${s.name}</b>
+        </div>
+        ${lessons.length>0?`
+        <div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:6px">📚 שיעורים (${lessons.length} שורות · ${totalUnits} יח')</div>
+        <div class="card cp mb12" style="padding:0;overflow:hidden">
+          ${lessons.map(r=>`
+          <div class="ir" style="border-bottom:1px solid var(--bd)">
+            <span class="ir-l">${fmtDate(r.date)}</span>
+            <span class="ir-v">${r.units} יח' · ${r.type==='test'?'טסט':r.type==='internal'?'פנימי':'שיעור'}${r.notes?' · '+r.notes:''}</span>
+          </div>`).join('')}
+        </div>`:''}
+        ${payments.length>0?`
+        <div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:6px">💵 תשלומים (${payments.length} שורות · ${fmtCur(totalPaid)})</div>
+        <div class="card cp mb12" style="padding:0;overflow:hidden">
+          ${payments.map(r=>`
+          <div class="ir" style="border-bottom:1px solid var(--bd)">
+            <span class="ir-l">${fmtDate(r.date)}</span>
+            <span class="ir-v">${fmtCur(r.payment)}${r.receipt?' · קבלה #'+r.receipt:''}${r.notes?' · '+r.notes:''}</span>
+          </div>`).join('')}
+        </div>`:''}
+      </div>
+      <div class="m-foot">
+        <button class="btn btn-o" onclick="closeModal()">ביטול</button>
+        <button class="btn btn-p" style="flex:1" onclick="confirmImportExcel('${sid}',${JSON.stringify(parsed).replace(/'/g,"&#39;")})">✅ ייבא הכל</button>
+      </div>
+      <div style="height:8px"></div>`);
+    }catch(err){
+      toast('שגיאה בקריאת הקובץ: '+err.message,'err');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function confirmImportExcel(sid, parsed){
+  if(typeof parsed==='string') parsed=JSON.parse(parsed);
+  const s=S.students.find(x=>x.id===sid);
+  if(!s)return;
+  let lCount=0, pCount=0;
+  parsed.forEach(r=>{
+    if(r.units>0){
+      const lesson={
+        id:uid(), studentId:sid, date:r.date, time:'', type:r.type||'lesson',
+        duration:r.units, status:'done', notes:(r.notes||'ייבוא מ-Excel')||null
+      };
+      dbLesson(lesson);
+      lCount++;
+    }
+    if(r.payment>0){
+      const payment={
+        id:uid(), studentId:sid, amount:r.payment, date:r.date,
+        method:'cash', receiptNum:r.receipt||null, notes:(r.notes||'ייבוא מ-Excel')||null
+      };
+      dbPayment(payment);
+      pCount++;
+    }
+  });
+  closeModal();
+  toast('יובאו '+lCount+' שיעורים ו-'+pCount+' תשלומים ✅','ok');
+  renderContent();
+}
+
 
 function restoreStudent(id){
   const s=S.students.find(x=>x.id===id);
