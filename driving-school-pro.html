@@ -820,7 +820,7 @@ function renderStudents(){
   else if(S.studentFilter==='premium') list=list.filter(s=>s.pkg==='premium');
   else if(S.studentFilter==='per_lesson') list=list.filter(s=>s.pkg==='per_lesson');
   else if(S.studentFilter==='debt') list=list.filter(s=>calcBalance(s.id).debt>0);
-  if(S.searchQ) list=list.filter(s=>s.name.includes(S.searchQ)||s.phone.includes(S.searchQ)||(s.idnum||'').includes(S.searchQ));
+  if(S.searchQ) list=list.filter(s=>s.name.includes(S.searchQ)||(s.phone||'').includes(S.searchQ)||String(s.idNum||s.idnum||'').includes(S.searchQ));
   list.sort((a,b)=>a.name.localeCompare(b.name,'he'));
 
   const chipsHTML=filters.map(f=>`<button class="chip ${S.studentFilter===f.id?'active':''}" onclick="setFilter('${f.id}')">${f.label}</button>`).join('');
@@ -2198,6 +2198,71 @@ function confirmDeletePayment(id){
   closeModal();
   toast('תשלום נמחק','ok');
   renderContent();
+}
+
+
+// ════════════════════════════════════════════════
+// ייבוא היסטוריית תלמידים — קרא מהקונסול: importStudent('מואטז') / importStudent('וקשטוק')
+// ════════════════════════════════════════════════
+const _IMPORT_DATA = {
+  'מואטז': {
+    student: {name:'טואטחה מואטז',idNum:'300273596',dob:'1986-11-23',phone:'0529365405',email:'monatawatha2026@gmail.com',price:160,pricingType:'package',packagePrice:5200,status:'active',registrationFee:150,theory:true,doctorCheck:true,eyeCheck:true},
+    lessons: [
+      ['2026-02-03','09:00','lesson',2],['2026-02-05','11:20','lesson',2],['2026-02-09','13:40','lesson',2],
+      ['2026-02-12','07:20','lesson',2],['2026-02-12','08:40','lesson',2],['2026-02-26','07:20','lesson',2],
+      ['2026-03-13','08:20','lesson',2],['2026-03-22','16:00','lesson',2],['2026-03-23','16:20','lesson',2],
+      ['2026-04-06','16:00','lesson',1],['2026-04-15','07:10','internal',1],['2026-05-04','16:40','lesson',1],
+      ['2026-05-08','11:50','test',1]
+    ],
+    payments: [
+      ['2026-02-05',1000,'bit','200145'],['2026-02-09',1250,'cash','200150'],
+      ['2026-03-23',2000,'cash','200190'],['2026-05-04',500,'cash','200239']
+    ]
+  },
+  'וקשטוק': {
+    student: {name:'ניר וקשטוק',idNum:'331767384',dob:'2008-01-02',phone:'0545448665',email:'nirvak2008@gmail.com',price:170,pricingType:'perUnit',status:'active',registrationFee:150,theory:true,doctorCheck:true,eyeCheck:true},
+    lessons: [
+      ['2025-10-28','06:00','lesson',1],['2025-11-02','20:00','lesson',2],['2025-11-04','06:00','lesson',2],
+      ['2025-11-06','06:30','lesson',2],['2025-11-12','06:20','lesson',2],['2025-11-16','19:10','lesson',2],
+      ['2025-11-20','19:00','lesson',2],['2025-11-24','18:20','lesson',2],['2025-11-27','06:00','lesson',2],
+      ['2025-12-03','14:30','lesson',2],['2025-12-08','06:20','lesson',2],['2025-12-11','11:40','lesson',2],
+      ['2025-12-17','07:40','lesson',2],['2025-12-22','15:50','lesson',2],['2025-12-29','18:00','lesson',2],
+      ['2026-01-05','18:00','lesson',2],['2026-01-09','11:50','lesson',2],['2026-01-11','17:00','lesson',2],
+      ['2026-01-19','18:10','lesson',2],['2026-01-26','17:00','lesson',2],['2026-02-03','17:40','lesson',2],
+      ['2026-02-05','09:20','internal',1.5],['2026-02-22','13:00','lesson',2],['2026-02-26','13:00','lesson',2],
+      ['2026-03-08','12:40','lesson',2],['2026-03-15','11:00','lesson',2],['2026-03-17','10:40','lesson',2],
+      ['2026-03-30','09:00','lesson',2],['2026-04-06','09:00','lesson',2],['2026-04-12','05:40','lesson',1],
+      ['2026-04-12','07:10','test',1]
+    ],
+    payments: [
+      ['2025-10-28',170,'cash','200042'],['2025-11-02',340,'bit','200044'],['2025-11-04',340,'bit','200045'],
+      ['2025-11-06',340,'bit','200050'],['2025-11-12',340,'bit','200060'],['2025-11-16',340,'bit','200061'],
+      ['2025-11-24',340,'bit','200068'],['2025-11-27',340,'bit','200069'],['2025-12-03',340,'bit','200078'],
+      ['2025-12-08',340,'bit','200083'],['2025-12-11',340,'bit','200087'],['2025-12-17',340,'bit','200090'],
+      ['2025-12-22',340,'bit','200098'],['2025-12-29',340,'bit','200103'],['2026-01-05',340,'bit','200113'],
+      ['2026-01-09',340,'bit','200120'],['2026-01-11',340,'bit','200123'],['2026-01-19',340,'bit','200130'],
+      ['2026-01-26',340,'bit','200134'],['2026-02-03',340,'bit','200140'],['2026-02-05',255,'bit','200141'],
+      ['2026-02-05',50,'cash','200146'],['2026-02-22',340,'bit','200162'],['2026-02-26',340,'bit','200166'],
+      ['2026-03-08',340,'bit','200170'],['2026-03-15',340,'bit','200176'],['2026-03-17',340,'bit','200182'],
+      ['2026-03-30',340,'bit','200196'],['2026-04-06',340,'bit','200205'],['2026-04-12',400,'bit','200211']
+    ]
+  }
+};
+
+function importStudent(key){
+  const data=_IMPORT_DATA[key];
+  if(!data){toast('מפתח לא קיים. נסה: מואטז / וקשטוק','err');return;}
+  let st=S.students.find(s=>s.name.includes(key));
+  if(!st){st={...data.student,id:uid()};dbStudent(st);console.log('✅ תלמיד נוצר:',st.name);}
+  else{console.log('✅ תלמיד קיים:',st.name);}
+  const sid=st.id;
+  const ex=S.lessons.filter(l=>l.studentId===sid&&(l.notes||'').includes('ייבוא מיומן'));
+  if(ex.length>0&&!confirm('נמצאו '+ex.length+' שיעורים קיימים עבור '+st.name+'. להמשיך?'))return;
+  data.lessons.forEach(r=>dbLesson({id:uid(),studentId:sid,date:r[0],time:r[1],type:r[2],duration:r[3],status:'done',notes:'ייבוא מיומן'}));
+  data.payments.forEach(r=>dbPayment({id:uid(),studentId:sid,date:r[0],amount:r[1],method:r[2],receiptNum:r[3],notes:'ייבוא מיומן'}));
+  S.selStudent=sid; S.view='students'; S.detailTab='lessons';
+  renderContent();
+  toast('✅ '+st.name+' — '+data.lessons.length+' שיעורים, '+data.payments.length+' תשלומים','ok');
 }
 
 document.addEventListener('DOMContentLoaded', appInit);
