@@ -690,7 +690,6 @@ function navigate(view, data=null){
     if(!pill&&b.dataset.view===view){ const ico=b.querySelector('.nav-icon'); if(ico){const w=document.createElement('div');w.className='nav-pill';ico.parentNode.replaceChild(w,ico);w.appendChild(ico);} }
     else if(pill&&b.dataset.view!==view){ const ico=pill.querySelector('.nav-icon'); if(ico){pill.parentNode.replaceChild(ico,pill);} }
   });
-  renderHeader();
   renderContent();
 }
 
@@ -730,7 +729,12 @@ function renderContent(){
     case 'archive': c.innerHTML=renderArchive(); break;
     default: c.innerHTML=renderDashboard();
   }
+  renderHeader();
   bindEvents();
+}
+
+function bindEvents(){
+  // כל ה-event handlers הם inline onclick — אין צורך בקישור נוסף
 }
 
 // ═══════════════════════════════════════════════
