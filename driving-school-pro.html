@@ -752,7 +752,16 @@ function renderDashboard(){
 
   let alertHTML='';
   if(debtors.length>0){
-    alertHTML=`<div class="alert-box alert-r"><div class="alert-ico">⚠️</div><div class="alert-txt fw7">חייבים מעל ₪1,000:<br>${debtors.map(d=>`<span>${d.name} — <span class="tr">${fmtCur(d.debt)}</span></span>`).join(' | ')}</div></div>`;
+    alertHTML+=`<div class="alert-box alert-r"><div class="alert-ico">⚠️</div><div class="alert-txt fw7">חייבים מעל ₪1,000:<br>${debtors.map(d=>`<span>${d.name} — <span class="tr">${fmtCur(d.debt)}</span></span>`).join(' | ')}</div></div>`;
+  }
+  // שיעורים שעברו תאריכם ועדיין מסומנים "מתוכנן"
+  const pastScheduled=S.lessons.filter(l=>l.status==='scheduled'&&l.date<todayStr());
+  if(pastScheduled.length>0){
+    alertHTML+=`<div class="alert-box alert-w"><div class="alert-ico">📅</div><div class="alert-txt">
+      <span class="fw7">${pastScheduled.length} שיעורים עברו ועדיין "מתוכנן"</span><br>
+      <button class="btn btn-p btn-sm" style="margin-top:8px" onclick="bulkMarkDone()">✅ סמן הכל כבוצע</button>
+      <button class="btn btn-o btn-sm" style="margin-top:8px;margin-right:6px" onclick="showPastScheduled()">👁 סקירה</button>
+    </div></div>`;
   }
 
   let todayHTML='';
@@ -885,10 +894,17 @@ function renderStudentDetail(){
       <div class="ir"><span class="ir-l tc">סה"כ שולם</span><span class="ir-v tc fw7">− ${fmtCur(bal.paid)}</span></div>
       <div class="ir" style="border-top:2px solid var(--bd);margin-top:4px;padding-top:8px"><span class="ir-l fw8" style="font-size:15px">יתרת חוב</span><span class="ir-v fw8 ${bal.debt>0?'tr':bal.debt<0?'tc':'tm'}" style="font-size:16px">${bal.debt>0?fmtCur(bal.debt):bal.debt<0?'זכות '+fmtCur(-bal.debt):'מסולק ✅'}</span></div>
     </div>
+    ${s.status==='archived'?`
+    <div class="m-foot" style="padding:16px">
+      <button class="btn btn-p btn-full" onclick="showImportHistory('${s.id}')">📥 ייבוא נתוני עבר</button>
+    </div>
+    <div style="padding:0 16px 8px">
+      <button class="btn btn-o btn-full" onclick="restoreStudent('${s.id}')">↩️ החזר לפעיל</button>
+    </div>`:`
     <div class="m-foot" style="padding:16px">
       <button class="btn btn-p btn-full" onclick="showAddPayment('${s.id}')">➕ רשום תשלום</button>
       <button class="btn btn-g" onclick="showAddLesson('${s.id}')">+ שיעור</button>
-    </div>`;
+    </div>`}`;
   } else if(S.detailTab==='lessons'){
     const lessonHTML=lessons.length===0?`<div class="empty"><div class="empty-ico">📚</div><div class="empty-t">אין שיעורים עדיין</div></div>`:
       `<div class="card" style="margin:12px 16px">${lessons.map(l=>`
@@ -1742,6 +1758,178 @@ async function appInit(){
     if(ok){ showSyncStatus('✅ מסונכרן', 2500); renderContent(); }
     else   { showSyncStatus('⚠️ עובד מקומית', 2500); }
   }
+}
+
+
+// ════════════════════════════════════════════════
+// IMPORT HISTORY — לתלמידים ארכיוניים
+// ════════════════════════════════════════════════
+function showImportHistory(sid){
+  const s=S.students.find(x=>x.id===sid);
+  if(!s)return;
+  const existLessons=S.lessons.filter(l=>l.studentId===sid&&l.status==='done');
+  const existPaid=S.payments.filter(p=>p.studentId===sid).reduce((a,p)=>a+Number(p.amount||0),0);
+  const totalUnits=existLessons.reduce((a,l)=>a+(Number(l.duration)||1),0);
+  openModal(`
+  <div class="m-handle"></div>
+  <div class="m-hdr"><span class="m-title">📥 ייבוא נתוני עבר</span><button class="m-close" onclick="closeModal()">×</button></div>
+  <div style="margin:0 16px 12px;padding:10px 14px;background:var(--pll);border-radius:var(--rs);font-size:13px;color:var(--p)">
+    ✏️ הזן נתוני סיכום עבור <b>${s.name}</b><br>
+    המערכת תיצור רשומה מסכמת אחת לשיעורים ואחת לתשלום.
+  </div>
+  <div class="m-body">
+    ${totalUnits>0||existPaid>0?`<div class="alert-box alert-w mb12"><div class="alert-ico">ℹ️</div><div class="alert-txt">
+      נתונים קיימים: ${totalUnits} יח' שיעורים, ${existPaid>0?'שולם '+fmtCur(existPaid):'אין תשלומים'}<br>
+      הייבוא יוסיף על הקיים (לא ידרוס)
+    </div></div>`:''}
+    <div class="frow">
+      <div class="fg"><label class="fl">יחידות שיעורים שבוצעו</label>
+        <input class="fi" id="f-imp-units" type="number" min="0" step="1" placeholder="0" value="">
+      </div>
+      <div class="fg"><label class="fl">מחיר ליחידה (₪)</label>
+        <input class="fi" id="f-imp-price" type="number" min="0" step="10" placeholder="${s.price||160}" value="${s.price||160}">
+      </div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">מספר מבחנים פנימיים</label>
+        <input class="fi" id="f-imp-internal" type="number" min="0" step="1" placeholder="0" value="0">
+      </div>
+      <div class="fg"><label class="fl">מספר טסטים חיצוניים</label>
+        <input class="fi" id="f-imp-tests" type="number" min="0" step="1" placeholder="0" value="0">
+      </div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">סה"כ שולם (₪)</label>
+        <input class="fi" id="f-imp-paid" type="number" min="0" step="50" placeholder="0" value="">
+      </div>
+      <div class="fg"><label class="fl">תאריך (בערך)</label>
+        <input class="fi" id="f-imp-date" type="date" value="${s.archivedDate||todayStr()}">
+      </div>
+    </div>
+  </div>
+  <div class="m-foot">
+    <button class="btn btn-o" onclick="closeModal()">ביטול</button>
+    <button class="btn btn-p" style="flex:1" onclick="saveImportHistory('${sid}')">שמור נתונים</button>
+  </div>
+  <div style="height:8px"></div>`);
+}
+
+function saveImportHistory(sid){
+  const s=S.students.find(x=>x.id===sid);
+  if(!s)return;
+  const units=parseFloat(document.getElementById('f-imp-units')?.value||0);
+  const price=parseFloat(document.getElementById('f-imp-price')?.value||0);
+  const internals=parseInt(document.getElementById('f-imp-internal')?.value||0);
+  const tests=parseInt(document.getElementById('f-imp-tests')?.value||0);
+  const paid=parseFloat(document.getElementById('f-imp-paid')?.value||0);
+  const date=document.getElementById('f-imp-date')?.value||todayStr();
+
+  if(units<=0&&paid<=0&&internals<=0&&tests<=0){
+    toast('הזן לפחות נתון אחד','err'); return;
+  }
+
+  // יצירת שיעורים מסכמים
+  if(units>0){
+    dbLesson({id:uid(),studentId:sid,date,time:'',type:'lesson',duration:units,status:'done',notes:'ייבוא נתוני עבר (סיכום)'});
+  }
+  for(let i=0;i<internals;i++){
+    dbLesson({id:uid(),studentId:sid,date,time:'',type:'internal',duration:1,status:'done',notes:'ייבוא נתוני עבר'});
+  }
+  for(let i=0;i<tests;i++){
+    dbLesson({id:uid(),studentId:sid,date,time:'',type:'test',duration:1,status:'done',notes:'ייבוא נתוני עבר'});
+  }
+
+  // יצירת תשלום מסכם
+  if(paid>0){
+    dbPayment({id:uid(),studentId:sid,amount:paid,date,method:'cash',notes:'ייבוא נתוני עבר (סיכום)'});
+  }
+
+  closeModal();
+  toast('נתוני עבר נשמרו ✅','ok');
+  renderContent();
+}
+
+function restoreStudent(id){
+  const s=S.students.find(x=>x.id===id);
+  if(!s)return;
+  s.status='active';
+  delete s.archivedDate;
+  dbStudent(s);
+  toast(s.name+' הוחזר לפעיל ✅','ok');
+  navigate('students');
+}
+
+
+// ════════════════════════════════════════════════
+// עדכון מאסיבי — שיעורים שעברו ועדיין "מתוכנן"
+// ════════════════════════════════════════════════
+function bulkMarkDone(){
+  const past=S.lessons.filter(l=>l.status==='scheduled'&&l.date<todayStr());
+  if(past.length===0){toast('אין שיעורים לעדכון','');return;}
+  openModal(`
+  <div class="m-handle"></div>
+  <div class="m-hdr"><span class="m-title">✅ עדכון שיעורי עבר</span><button class="m-close" onclick="closeModal()">×</button></div>
+  <div class="m-body">
+    <div class="alert-box alert-w mb12"><div class="alert-ico">📋</div><div class="alert-txt">
+      נמצאו <b>${past.length} שיעורים</b> שעברו תאריכם ועדיין מסומנים "מתוכנן".<br>
+      בחר כיצד לסמן אותם:
+    </div></div>
+    <div style="display:flex;flex-direction:column;gap:8px;padding:4px 0">
+      <button class="btn btn-g btn-full" onclick="doBulkStatus('done')">✅ סמן הכל כ"בוצע"</button>
+      <button class="btn btn-d btn-full" onclick="doBulkStatus('cancelled')">❌ סמן הכל כ"בוטל"</button>
+      <button class="btn btn-o btn-full" onclick="closeModal()">ביטול — אעדכן ידנית</button>
+    </div>
+  </div>
+  <div style="height:16px"></div>`);
+}
+
+function doBulkStatus(status){
+  const past=S.lessons.filter(l=>l.status==='scheduled'&&l.date<todayStr());
+  past.forEach(l=>{ l.status=status; apiPost('save','Lessons',l); });
+  dbSave();
+  closeModal();
+  toast(`${past.length} שיעורים עודכנו ✅`,'ok');
+  renderContent();
+}
+
+function showPastScheduled(){
+  const past=S.lessons.filter(l=>l.status==='scheduled'&&l.date<todayStr())
+    .sort((a,b)=>a.date.localeCompare(b.date));
+  openModal(`
+  <div class="m-handle"></div>
+  <div class="m-hdr"><span class="m-title">📅 שיעורי עבר — סקירה</span><button class="m-close" onclick="closeModal()">×</button></div>
+  <div class="m-body" style="padding:0">
+    <div class="card" style="margin:0 16px 12px">
+      ${past.map(l=>{
+        const st=S.students.find(s=>s.id===l.studentId);
+        return `<div class="pi">
+          <div class="pi-ico" style="background:var(--wal);font-size:14px">📅</div>
+          <div class="pi-info">
+            <div class="pi-n">${st?st.name:'?'} — ${fmtDateShort(l.date)} ${l.time||''}</div>
+            <div class="pi-d">${LESSON_TYPES[l.type]||l.type} · ${l.duration||1} יח'</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <button class="btn btn-g btn-sm" style="padding:4px 8px;font-size:11px" onclick="quickStatus('${l.id}','done')">✅</button>
+            <button class="btn btn-d btn-sm" style="padding:4px 8px;font-size:11px" onclick="quickStatus('${l.id}','cancelled')">❌</button>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>
+  <div class="m-foot">
+    <button class="btn btn-g" style="flex:1" onclick="doBulkStatus('done')">✅ עדכן הכל כבוצע</button>
+    <button class="btn btn-o" onclick="closeModal()">סגור</button>
+  </div>
+  <div style="height:8px"></div>`);
+}
+
+function quickStatus(id, status){
+  const l=S.lessons.find(x=>x.id===id);
+  if(!l)return;
+  l.status=status;
+  dbLesson(l);
+  // refresh the modal
+  showPastScheduled();
 }
 
 document.addEventListener('DOMContentLoaded', appInit);
