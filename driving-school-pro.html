@@ -493,7 +493,8 @@ const S = {
   selStudent: null,
   detailTab: 'overview',
   searchQ: '',
-  payFilter: 'all'
+  payFilter: 'all',
+  calView: 'month'
 };
 
 // ═══════════════════════════════════════════════
@@ -989,6 +990,32 @@ function setDetailTab(t){ S.detailTab=t; renderContent(); }
 // ═══════════════════════════════════════════════
 // CALENDAR
 // renderCalendar מוגדרת למטה עם תמיכה בגריד
+
+function renderCalendar(){
+  if(!S.calView) S.calView='month';
+  const seg=`<div class="seg" style="margin:10px 16px 0">
+    <div class="seg-btn ${S.calView==='month'?'active':''}" onclick="setCalView('month')">חודש</div>
+    <div class="seg-btn ${S.calView==='week'?'active':''}" onclick="setCalView('week')">שבוע</div>
+    <div class="seg-btn ${S.calView==='day'?'active':''}" onclick="setCalView('day')">יום</div>
+  </div>`;
+  if(S.calView==='week') return seg+renderCalWeek();
+  if(S.calView==='day')  return seg+renderCalDay();
+  return seg+renderCalMonth();
+}
+
+function updateLessonStatus(id,status){
+  const l=S.lessons.find(x=>x.id===id);
+  if(!l)return;
+  l.status=status;
+  dbLesson(l);
+  closeModal();
+  toast('סטטוס עודכן ✅','ok');
+  renderContent();
+}
+
+function apiSave(type,data){ apiPost('save',type,data); }
+
+
 
 function setCalView(v){ S.calView=v; renderContent(); }
 
@@ -1721,3 +1748,4 @@ document.addEventListener('DOMContentLoaded', appInit);
 </script>
 </body>
 </html>
+                  
