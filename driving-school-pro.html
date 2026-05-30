@@ -2454,7 +2454,6 @@ async function previewCsvImport(files){
       status='orphan';label='<span style="color:var(--t2);font-size:11px">❓</span>';
     }
     const name=csvS?csvS.name:(existing?existing.name:`ת״ז ${id}`);
-    const name=csvS?csvS.name:(existing?existing.name:'תחז '+id);
     const lessonsTotal=csvS?csvS.lessonsTotal||0:0;
     previewRows.push({id,name,csvS,existing,newPays,status,label,detail,lessonsTotal});
 
