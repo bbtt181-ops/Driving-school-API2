@@ -2366,8 +2366,9 @@ function _extractCsvFinance(rows,hi){
     const idNum=(r[1]||'').trim();
     if(!idNum) continue;
     const priceVal=parseFloat((r[3]||'').replace(/[₪,\s]/g,''))||0;
-    if(priceVal>500) fin[idNum]={pricingType:'package',packagePrice:priceVal,price:160};
-    else if(priceVal>0) fin[idNum]={pricingType:'perUnit',price:priceVal};
+    const lessonsTotal=parseFloat((r[5]||'0').replace(/[,\s]/g,''))||0;
+    if(priceVal>500) fin[idNum]={pricingType:'package',packagePrice:priceVal,price:160,lessonsTotal};
+    else if(priceVal>0) fin[idNum]={pricingType:'perUnit',price:priceVal,lessonsTotal};
   }
   return fin;
 }
@@ -2416,8 +2417,8 @@ async function previewCsvImport(files){
   // הוסף תמחור לתלמידים
   csvStudents.forEach(s=>{
     const f=csvFinance[s.idNum];
-    if(f){s.pricingType=f.pricingType;s.price=f.price;if(f.packagePrice)s.packagePrice=f.packagePrice;}
-    else{s.pricingType='perUnit';s.price=170;}
+    if(f){s.pricingType=f.pricingType;s.price=f.price;if(f.packagePrice)s.packagePrice=f.packagePrice;s.lessonsTotal=f.lessonsTotal||0;}
+    else{s.pricingType='perUnit';s.price=170;s.lessonsTotal=0;}
   });
 
   // בנה מפה לפי ת"ז
@@ -2453,24 +2454,28 @@ async function previewCsvImport(files){
       status='orphan';label='<span style="color:var(--t2);font-size:11px">❓</span>';
     }
     const name=csvS?csvS.name:(existing?existing.name:`ת״ז ${id}`);
-    previewRows.push({id,name,csvS,existing,newPays,status,label,detail});
-  });
+    const name=csvS?csvS.name:(existing?existing.name:'תחז '+id);
+    const lessonsTotal=csvS?csvS.lessonsTotal||0:0;
+    previewRows.push({id,name,csvS,existing,newPays,status,label,detail,lessonsTotal});
 
   const newCnt=previewRows.filter(r=>r.status==='new').length;
   const updCnt=previewRows.filter(r=>r.status==='update').length;
   const payCnt=previewRows.reduce((a,r)=>a+r.newPays.length,0);
+  const lessonsCnt=Math.round(previewRows.reduce((a,r)=>a+(r.lessonsTotal||0),0));
   _csvImportData={previewRows};
 
   let html=`<div style="background:var(--bg2);border-radius:10px;padding:12px 8px;margin-bottom:12px;display:flex;gap:0;justify-content:space-around">
-    <div style="text-align:center"><div style="font-size:24px;font-weight:800;color:#22c55e">${newCnt}</div><div style="font-size:11px;color:var(--t2)">חדשים</div></div>
-    <div style="text-align:center"><div style="font-size:24px;font-weight:800;color:var(--p)">${updCnt}</div><div style="font-size:11px;color:var(--t2)">לעדכון</div></div>
-    <div style="text-align:center"><div style="font-size:24px;font-weight:800;color:var(--t1)">${payCnt}</div><div style="font-size:11px;color:var(--t2)">תשלומים</div></div>
+    <div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#22c55e">${newCnt}</div><div style="font-size:11px;color:var(--t2)">חדשים</div></div>
+    <div style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--p)">${updCnt}</div><div style="font-size:11px;color:var(--t2)">עדכון</div></div>
+    <div style="text-align:center"><div style="font-size:22px;font-weight:800;color:#f59e0b">${lessonsCnt}</div><div style="font-size:11px;color:var(--t2)">יח׳</div></div>
+    <div style="text-align:center"><div style="font-size:22px;font-weight:800;color:var(--t1)">${payCnt}</div><div style="font-size:11px;color:var(--t2)">תשלומים</div></div>
   </div>
   <div style="border-radius:10px;overflow:hidden;border:1px solid var(--br)">
   <table style="width:100%;border-collapse:collapse;font-size:13px">
   <thead><tr style="background:var(--bg2)">
     <th style="padding:8px 10px;text-align:right;font-weight:700;border-bottom:1px solid var(--br)">תלמיד</th>
     <th style="padding:8px 6px;text-align:center;font-weight:700;border-bottom:1px solid var(--br)">סטטוס</th>
+    <th style="padding:8px 6px;text-align:center;font-weight:700;border-bottom:1px solid var(--br)">יח׳</th>
     <th style="padding:8px 6px;text-align:center;font-weight:700;border-bottom:1px solid var(--br)">תשלומים</th>
   </tr></thead><tbody>`;
   previewRows.forEach((r,i)=>{
@@ -2479,6 +2484,7 @@ async function previewCsvImport(files){
     html+=`<tr style="${bg}">
       <td style="padding:7px 10px">${r.name}${r.detail?`<div style="font-size:10px;color:var(--t2)">${r.detail}</div>`:''}</td>
       <td style="padding:7px 6px;text-align:center">${r.label}</td>
+      <td style="padding:7px 6px;text-align:center">${r.lessonsTotal||'—'}</td>
       <td style="padding:7px 6px;text-align:center">${pays}</td>
     </tr>`;
   });
@@ -2491,7 +2497,7 @@ async function previewCsvImport(files){
 function runCsvImport(){
   if(!_csvImportData)return;
   const {previewRows}=_csvImportData;
-  let newS=0,updS=0,newP=0;
+  let newS=0,updS=0,newP=0,newL=0;
   previewRows.forEach(r=>{
     let sid=null;
     if(r.status==='new'&&r.csvS){
@@ -2518,279 +2524,23 @@ function runCsvImport(){
         newP++;
       });
     }
-  });
-  dbSave();
-  closeModal();
-  S.view='students';
-  renderContent();
-  toast(`✅ ${newS} תלמידים חדשים, ${updS} עודכנו, ${newP} תשלומים`,'ok');
-}
-
-document.addEventListener('DOMContentLoaded', appInit);
-</script>
-</body>
-</html>
-                  ent();
-  toast('✅ '+st.name+' — '+data.lessons.length+' שיעורים, '+data.payments.length+' תשלומים','ok');
-}
-
-// ════════════════════════════════════════════════
-// ייבוא CSV מגיליון ישן
-// ════════════════════════════════════════════════
-
-let _csvImportData = null;
-
-function showCsvImport(){
-  openModal(`
-  <div class="m-handle"></div>
-  <div class="m-hdr"><span class="m-title">📥 ייבוא מגיליון ישן</span><button class="m-close" onclick="closeModal()">×</button></div>
-  <div class="m-body" style="padding-bottom:8px">
-    <div class="alert-box alert-w mb12"><div class="alert-ico">ℹ️</div><div class="alert-txt">
-      בחר עד 3 קבצי CSV: תלמידים, כספים, היסטוריית תשלומים.<br>
-      תלמידים קיימים יעודכנו — תשלומים כפולים (לפי מס׳ קבלה) יידלגו.
-    </div></div>
-    <div id="csv-drop" onclick="document.getElementById('csv-files').click()"
-      style="border:2px dashed var(--br);border-radius:12px;padding:28px 16px;text-align:center;cursor:pointer;background:var(--bg2);margin-bottom:12px">
-      <div style="font-size:36px">📂</div>
-      <div style="font-weight:700;margin:8px 0 4px;font-size:15px">לחץ לבחירת קבצים</div>
-      <div style="font-size:12px;color:var(--t2)">ניתן לבחור כמה קבצים בו-זמנית</div>
-    </div>
-    <input type="file" id="csv-files" multiple accept=".csv" style="display:none" onchange="previewCsvImport(this.files)">
-    <div id="csv-preview"></div>
-  </div>
-  <div class="m-foot" id="csv-foot" style="display:none">
-    <button class="btn btn-o" onclick="closeModal()">ביטול</button>
-    <button class="btn btn-p" style="flex:1" onclick="runCsvImport()">✅ ייבא הכל</button>
-  </div>`);
-  _csvImportData = null;
-}
-
-function _parseCSV(text){
-  if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
-  const rows=[];let row=[];let field='';let inQ=false;
-  for(let i=0;i<text.length;i++){
-    const ch=text[i],nx=text[i+1];
-    if(inQ){
-      if(ch==='"'&&nx==='"'){field+='"';i++;}
-      else if(ch==='"'){inQ=false;}
-      else{field+=ch;}
-    }else{
-      if(ch==='"'){inQ=true;}
-      else if(ch===','){row.push(field);field='';}
-      else if(ch==='\r'&&nx==='\n'){row.push(field);field='';rows.push(row);row=[];i++;}
-      else if(ch==='\n'){row.push(field);field='';rows.push(row);row=[];}
-      else{field+=ch;}
-    }
-  }
-  if(row.length||field){row.push(field);rows.push(row);}
-  return rows;
-}
-
-function _detectCsvType(rows){
-  for(let i=0;i<rows.length;i++){
-    const r=rows[i];
-    if(!r||!r[0]||r[0].trim()!=='#') continue;
-    const h=r.map(x=>(x||'').replace(/[\n\r]/g,' ').trim());
-    if(h.some(x=>x==='שם פרטי')) return {type:'students',hi:i};
-    if(h.some(x=>x.includes('תמחור')||x.includes('שיעורים שנלקחו')||x.includes('עלות כוללת'))) return {type:'finance',hi:i};
-    if(h.some(x=>x.includes("מס' זהות")||x.includes('אופן התשלום'))) return {type:'payments',hi:i};
-  }
-  return null;
-}
-
-function _readFileText(file){
-  return new Promise(res=>{const fr=new FileReader();fr.onload=e=>res(e.target.result);fr.readAsText(file,'UTF-8');});
-}
-
-function _extractCsvStudents(rows,hi){
-  const out=[];
-  for(let i=hi+1;i<rows.length;i++){
-    const r=rows[i];
-    if(!r||!r[0]||!/^\d+$/.test(r[0].trim())) continue;
-    const name=((r[1]||'').trim()+' '+(r[2]||'').trim()).replace(/\s+/g,' ').trim();
-    const idNum=(r[3]||'').trim();
-    if(!idNum||!name) continue;
-    const dobRaw=(r[4]||'').trim();
-    let dob='';
-    if(dobRaw){const p=dobRaw.split('/');if(p.length===3)dob=p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0');}
-    const phone=(r[9]||'').trim()+(r[8]||'').trim();
-    const email=(r[10]||'').trim();
-    const status=(r[11]||'').trim()==='פעיל'?'active':'inactive';
-    const regRaw=(r[12]||'').trim();
-    const registrationFee=/^\d+$/.test(regRaw)?parseInt(regRaw):0;
-    const theory=(r[13]||'').trim()==='כן';
-    const doctorCheck=(r[14]||'').trim().toUpperCase()==='TRUE'||(r[14]||'').trim()==='כן';
-    const eyeCheck=(r[15]||'').trim().toUpperCase()==='TRUE'||(r[15]||'').trim()==='כן';
-    out.push({name,idNum,dob,phone,email,status,registrationFee,theory,doctorCheck,eyeCheck});
-  }
-  return out;
-}
-
-function _extractCsvFinance(rows,hi){
-  const fin={};
-  for(let i=hi+1;i<rows.length;i++){
-    const r=rows[i];
-    if(!r||!r[0]||!/^\d+$/.test(r[0].trim())) continue;
-    const idNum=(r[1]||'').trim();
-    if(!idNum) continue;
-    const priceVal=parseFloat((r[3]||'').replace(/[₪,\s]/g,''))||0;
-    if(priceVal>500) fin[idNum]={pricingType:'package',packagePrice:priceVal,price:160};
-    else if(priceVal>0) fin[idNum]={pricingType:'perUnit',price:priceVal};
-  }
-  return fin;
-}
-
-function _extractCsvPayments(rows,hi){
-  const out=[];
-  for(let i=hi+1;i<rows.length;i++){
-    const r=rows[i];
-    if(!r||!r[0]||!/^\d+$/.test(r[0].trim())) continue;
-    const idNum=(r[1]||'').trim();
-    const amount=parseFloat((r[3]||'0').replace(/[,₪\s]/g,''))||0;
-    const dateRaw=(r[4]||'').trim();
-    let date='';
-    if(dateRaw){const p=dateRaw.split('/');if(p.length===3)date=p[2]+'-'+p[1].padStart(2,'0')+'-'+p[0].padStart(2,'0');}
-    const receiptNum=(r[5]||'').trim();
-    const mRaw=(r[6]||'').trim();
-    const method=mRaw==='מזומן'?'cash':mRaw==='ביט'||mRaw.toLowerCase()==='bit'?'bit':mRaw==='העברה'?'transfer':mRaw;
-    const notes=(r[7]||'').trim();
-    if(!idNum||!amount||!date) continue;
-    out.push({idNum,amount,date,receiptNum,method,notes});
-  }
-  return out;
-}
-
-async function previewCsvImport(files){
-  const prev=document.getElementById('csv-preview');
-  prev.innerHTML='<div style="text-align:center;padding:20px;color:var(--t2)">⏳ מעבד קבצים...</div>';
-  const parsed={students:null,finance:null,payments:null};
-  for(const file of files){
-    const text=await _readFileText(file);
-    const rows=_parseCSV(text);
-    const det=_detectCsvType(rows);
-    if(det) parsed[det.type]={rows,hi:det.hi};
-  }
-  if(!parsed.students&&!parsed.payments){
-    prev.innerHTML='<div class="alert-box alert-r"><div class="alert-ico">⚠️</div><div class="alert-txt">לא זוהו קבצים תקינים. ודא שהקבצים הם: תלמידים / כספים / היסטוריית תשלומים.</div></div>';
-    return;
-  }
-  const csvStudents=parsed.students?_extractCsvStudents(parsed.students.rows,parsed.students.hi):[];
-  const csvFinance=parsed.finance?_extractCsvFinance(parsed.finance.rows,parsed.finance.hi):{};
-  const csvPayments=parsed.payments?_extractCsvPayments(parsed.payments.rows,parsed.payments.hi):[];
-  csvStudents.forEach(s=>{
-    const f=csvFinance[s.idNum];
-    if(f){s.pricingType=f.pricingType;s.price=f.price;if(f.packagePrice)s.packagePrice=f.packagePrice;}
-    else{s.pricingType='perUnit';s.price=170;}
-  });
-  const idToEx={};
-  S.students.forEach(s=>idToEx[String(s.idNum||s.idnum||'')]=s);
-  const payByIdNum={};
-  csvPayments.forEach(p=>{if(!payByIdNum[p.idNum])payByIdNum[p.idNum]=[];payByIdNum[p.idNum].push(p);});
-  const allIds=new Set([...csvStudents.map(s=>s.idNum),...Object.keys(payByIdNum)]);
-  const previewRows=[];
-  allIds.forEach(id=>{
-    const csvS=csvStudents.find(s=>s.idNum===id);
-    const existing=idToEx[id];
-    const pays=payByIdNum[id]||[];
-    const existingReceipts=new Set(S.payments.filter(p=>{
-      const st=S.students.find(s=>s.id===p.studentId);
-      return st&&String(st.idNum||st.idnum||'')===id;
-    }).map(p=>String(p.receiptNum||'')).filter(Boolean));
-    const newPays=pays.filter(p=>!p.receiptNum||!existingReceipts.has(String(p.receiptNum)));
-    let status,label,detail='';
-    if(existing){
-      status='update';
-      label='<span style="color:var(--p);font-size:11px;font-weight:700">🔄 עדכון</span>';
-      if(csvS){
-        const ch=[];
-        if(csvS.pricingType&&csvS.pricingType!==existing.pricingType)ch.push('סוג תמחור');
-        if(csvS.price&&csvS.price!==existing.price)ch.push('מחיר');
-        if(ch.length)detail=ch.join(', ');
+    if(sid&&r.lessonsTotal>0){
+      const hasArchive=S.lessons.some(l=>l.studentId===sid&&(l.notes||'').includes('ייבוא ארכיון'));
+      if(!hasArchive){
+        const archDate=r.newPays.length?r.newPays[0].date:'2025-01-01';
+        dbLesson({id:uid(),studentId:sid,date:archDate,time:'09:00',type:'lesson',duration:r.lessonsTotal,status:'done',notes:'ייבוא ארכיון - '+r.lessonsTotal+' יחידות'});
+        newL++;
       }
-    }else if(csvS){
-      status='new';
-      label='<span style="color:#22c55e;font-size:11px;font-weight:700">🆕 חדש</span>';
-    }else{
-      status='orphan';
-      label='<span style="color:var(--t2);font-size:11px">❓</span>';
-    }
-    const name=csvS?csvS.name:(existing?existing.name:'ת״ז '+id);
-    previewRows.push({id,name,csvS,existing,newPays,status,label,detail});
-  });
-  const newCnt=previewRows.filter(r=>r.status==='new').length;
-  const updCnt=previewRows.filter(r=>r.status==='update').length;
-  const payCnt=previewRows.reduce((a,r)=>a+r.newPays.length,0);
-  _csvImportData={previewRows};
-  let html='<div style="background:var(--bg2);border-radius:10px;padding:12px 8px;margin-bottom:12px;display:flex;gap:0;justify-content:space-around">'
-    +'<div style="text-align:center"><div style="font-size:24px;font-weight:800;color:#22c55e">'+newCnt+'</div><div style="font-size:11px;color:var(--t2)">חדשים</div></div>'
-    +'<div style="text-align:center"><div style="font-size:24px;font-weight:800;color:var(--p)">'+updCnt+'</div><div style="font-size:11px;color:var(--t2)">לעדכון</div></div>'
-    +'<div style="text-align:center"><div style="font-size:24px;font-weight:800;color:var(--t1)">'+payCnt+'</div><div style="font-size:11px;color:var(--t2)">תשלומים</div></div>'
-    +'</div>'
-    +'<div style="border-radius:10px;overflow:hidden;border:1px solid var(--br)">'
-    +'<table style="width:100%;border-collapse:collapse;font-size:13px">'
-    +'<thead><tr style="background:var(--bg2)">'
-    +'<th style="padding:8px 10px;text-align:right;font-weight:700;border-bottom:1px solid var(--br)">תלמיד</th>'
-    +'<th style="padding:8px 6px;text-align:center;font-weight:700;border-bottom:1px solid var(--br)">סטטוס</th>'
-    +'<th style="padding:8px 6px;text-align:center;font-weight:700;border-bottom:1px solid var(--br)">תשלומים</th>'
-    +'</tr></thead><tbody>';
-  previewRows.forEach(function(r,i){
-    const bg=i%2===0?'':'background:var(--bg2)';
-    const pays=r.newPays.length?'<span style="color:var(--p);font-weight:700">+'+r.newPays.length+'</span>':'<span style="color:var(--t2)">—</span>';
-    html+='<tr style="'+bg+'">'
-      +'<td style="padding:7px 10px">'+r.name+(r.detail?'<div style="font-size:10px;color:var(--t2)">'+r.detail+'</div>':'')+'</td>'
-      +'<td style="padding:7px 6px;text-align:center">'+r.label+'</td>'
-      +'<td style="padding:7px 6px;text-align:center">'+pays+'</td>'
-      +'</tr>';
-  });
-  html+='</tbody></table></div>';
-  prev.innerHTML=html;
-  const foot=document.getElementById('csv-foot');
-  if(foot)foot.style.display='flex';
-}
-
-function runCsvImport(){
-  if(!_csvImportData)return;
-  const previewRows=_csvImportData.previewRows;
-  let newS=0,updS=0,newP=0;
-  previewRows.forEach(function(r){
-    let sid=null;
-    if(r.status==='new'&&r.csvS){
-      const st=Object.assign({},r.csvS,{id:uid()});
-      dbStudent(st);sid=st.id;newS++;
-    }else if((r.status==='update'||r.status==='orphan')&&r.existing){
-      sid=r.existing.id;
-      if(r.status==='update'&&r.csvS){
-        if(r.csvS.pricingType) r.existing.pricingType=r.csvS.pricingType;
-        if(r.csvS.price) r.existing.price=r.csvS.price;
-        if(r.csvS.packagePrice) r.existing.packagePrice=r.csvS.packagePrice;
-        if(!r.existing.dob&&r.csvS.dob) r.existing.dob=r.csvS.dob;
-        if(!r.existing.email&&r.csvS.email) r.existing.email=r.csvS.email;
-        if(r.csvS.registrationFee) r.existing.registrationFee=r.csvS.registrationFee;
-        if(r.csvS.theory) r.existing.theory=r.csvS.theory;
-        if(r.csvS.doctorCheck) r.existing.doctorCheck=r.csvS.doctorCheck;
-        if(r.csvS.eyeCheck) r.existing.eyeCheck=r.csvS.eyeCheck;
-        dbStudent(r.existing);updS++;
-      }
-    }
-    if(sid&&r.newPays.length){
-      r.newPays.forEach(function(p){
-        dbPayment({id:uid(),studentId:sid,date:p.date,amount:p.amount,method:p.method,receiptNum:p.receiptNum||null,notes:p.notes||'ייבוא CSV'});
-        newP++;
-      });
     }
   });
   dbSave();
   closeModal();
   S.view='students';
   renderContent();
-  toast('✅ '+newS+' תלמידים חדשים, '+updS+' עודכנו, '+newP+' תשלומים','ok');
+  toast(`✅ ${newS} חדשים, ${updS} עודכנו, ${newL} שיעורי ארכיון, ${newP} תשלומים`,'ok');
 }
 
 document.addEventListener('DOMContentLoaded', appInit);
-</script>
-</body>
-</html>
-ded', appInit);
 </script>
 </body>
 </html>
