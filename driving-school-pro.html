@@ -483,8 +483,8 @@ const REG_FEE_NEW=150;
 const REG_FEE_TRANSFER=50;
 const HE_MONTHS=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
 const HE_DAYS=['א','ב','ג','ד','ה','ו','ש'];
-const LESSON_TYPES={lesson:'שיעור',internal:'מבחן פנימי',test:'טסט חיצוני',parking:'חניות'};
-const LESSON_STATUS={done:'בוצע',cancelled:'בוטל',noshow:'לא הגיע',scheduled:'מתוכנן'};
+const LESSON_TYPES={lesson:'שיעור',internal:'מבחן פנימי',test:'טסט חיצוני',parking:'חניות',event:'אירוע'};
+const LESSON_STATUS={done:'בוצע',cancelled:'בוטל',noshow:'לא הגיע',scheduled:'מתוכנן',failed:'נכשל'};
 const AVA_COLORS=['#1E40AF','#0891B2','#059669','#7C3AED','#DB2777','#D97706','#DC2626','#0369A1'];
 
 // ═══════════════════════════════════════════════
@@ -948,7 +948,7 @@ function renderStudentDetail(){
       <div class="test-row">
         <div class="test-num">${i+1}</div>
         <div class="test-info"><div class="test-date">${fmtDate(t.date)}</div><div class="test-res">${LESSON_STATUS[t.status]||t.status}${t.notes?' · '+t.notes:''}</div></div>
-        <div>${{done:'✅',cancelled:'❌',noshow:'⚠️'}[t.status]||'🕐'}</div>
+        <div>${{done:'✅',cancelled:'❌',noshow:'⚠️',failed:'💔'}[t.status]||'🕐'}</div>
       </div>`).join('')}</div>`;
     const max=20;
     tabContent=`<div class="card cp" style="margin:12px 16px">
@@ -1151,17 +1151,21 @@ function renderCalDay(){
 
 function lessonCard(l){
   const st=S.students.find(s=>s.id===l.studentId);
-  const stIco={done:'✅',cancelled:'❌',noshow:'⚠️',scheduled:'🕐'};
+  const stIco={done:'✅',cancelled:'❌',noshow:'⚠️',scheduled:'🕐',failed:'💔'};
   const typeColors={
     lesson:  {bg:'#3B1FA3',border:'#6D4FD6'},
     test:    {bg:'#92400E',border:'#F59E0B'},
     internal:{bg:'#064E3B',border:'#10B981'},
-    parking: {bg:'#1E3A5F',border:'#3B82F6'}
+    parking: {bg:'#1E3A5F',border:'#3B82F6'},
+    event:   {bg:'#365314',border:'#84CC16'}
   };
   const c=typeColors[l.type]||typeColors.lesson;
-  const dur=l.type==='test'?'₪230':(+l.duration||1)+' יח\'';
+  const rawDur=+l.duration||1;
+  const sizeLabel=rawDur===1?'בודד':rawDur===1.5?'×1.5':rawDur===2?'כפול':rawDur===3?'משולש':rawDur>3?`×${rawDur}`:'';
+  const dur=l.type==='test'?'₪230':`${rawDur} יח' ${sizeLabel?'· '+sizeLabel:''}`;
   const noteTxt=l.notes?`<div style="font-size:11px;opacity:.8;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:165px">${l.notes}</div>`:'';
-  return `<div class="lc" onclick="openLesson('${l.id}')" style="background:${c.bg};border:1.5px solid ${c.border};color:#fff">
+  const minH=Math.max(60, rawDur*44);
+  return `<div class="lc" onclick="openLesson('${l.id}')" style="background:${c.bg};border:1.5px solid ${c.border};color:#fff;min-height:${minH}px">
     <div class="lt"><div class="lt-t" style="color:rgba(255,255,255,.9)">${l.time||'--:--'}</div><div class="lt-d" style="color:rgba(255,255,255,.7)">${dur}</div></div>
     <div class="li" style="flex:1">
       <div class="li-n" style="color:#fff;font-weight:700">${st?st.name:'?'}</div>
@@ -1560,6 +1564,23 @@ async function deleteStudent(id){
 }
 
 // ADD LESSON
+function calcLessonDuration(){
+  const start=document.getElementById('f-ltime')?.value;
+  const end=document.getElementById('f-lendtime')?.value;
+  const durEl=document.getElementById('f-lduration');
+  if(!start||!end||!durEl) return;
+  const [sh,sm]=start.split(':').map(Number);
+  const [eh,em]=end.split(':').map(Number);
+  const mins=(eh*60+em)-(sh*60+sm);
+  if(mins<=0) return;
+  const units=Math.round(mins/40*10)/10;
+  durEl.value=units;
+  // עדכן תווית
+  const label=units===1?'שיעור בודד':units===1.5?'שיעור וחצי':units===2?'שיעור כפול':units===3?'שיעור משולש':`${units} יח'`;
+  durEl.style.color=units>=2?'#F59E0B':'var(--p)';
+  durEl.title=label;
+}
+
 function showAddLesson(studentId=null, defaultType='lesson'){
   const students=S.students.filter(s=>s.status==='active').sort((a,b)=>a.name.localeCompare(b.name,'he'));
   const selDate=S.calSel?`${S.calSel.y}-${String(S.calSel.m+1).padStart(2,'0')}-${String(S.calSel.d).padStart(2,'0')}`:todayStr();
@@ -1575,7 +1596,10 @@ function showAddLesson(studentId=null, defaultType='lesson'){
     </div>
     <div class="frow">
       <div class="fg"><label class="fl">תאריך *</label><input class="fi" id="f-ldate" type="date" value="${selDate}"></div>
-      <div class="fg"><label class="fl">שעה</label><input class="fi" id="f-ltime" type="time" value="09:00"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label class="fl">שעת התחלה</label><input class="fi" id="f-ltime" type="time" value="09:00" oninput="calcLessonDuration()"></div>
+      <div class="fg"><label class="fl">שעת סיום</label><input class="fi" id="f-lendtime" type="time" value="10:20" oninput="calcLessonDuration()"></div>
     </div>
     <div class="frow">
       <div class="fg"><label class="fl">סוג שיעור</label>
@@ -1584,16 +1608,12 @@ function showAddLesson(studentId=null, defaultType='lesson'){
           <option value="internal" ${defaultType==='internal'?'selected':''}>מבחן פנימי</option>
           <option value="test" ${defaultType==='test'?'selected':''}>טסט חיצוני</option>
           <option value="parking" ${defaultType==='parking'?'selected':''}>חניות</option>
+          <option value="event" ${defaultType==='event'?'selected':''}>🟢 אירוע (לא שיעור)</option>
         </select>
       </div>
       <div class="fg" id="dur-field" style="${defaultType==='test'?'display:none':''}">
         <label class="fl">יחידות (40 דק')</label>
-        <select class="fi fsel" id="f-lduration">
-          <option value="1">1 יח' (40 דק')</option>
-          <option value="1.5">1.5 יח' (60 דק')</option>
-          <option value="2">2 יח' (80 דק')</option>
-          <option value="3">3 יח' (120 דק')</option>
-        </select>
+        <input class="fi" id="f-lduration" type="number" step="0.5" min="0.5" value="2" style="font-weight:700;color:var(--p)" readonly>
       </div>
       <div class="fg" id="test-price-field" style="${defaultType==='test'?'':'display:none'}">
         <label class="fl">מחיר טסט</label>
@@ -1678,6 +1698,7 @@ function saveLesson(id){
   const sid=document.getElementById('f-lstudent')?.value;
   const date=document.getElementById('f-ldate')?.value;
   const time=document.getElementById('f-ltime')?.value;
+  const endTime=document.getElementById('f-lendtime')?.value;
   const type=document.getElementById('f-ltype')?.value;
   const duration=parseFloat(document.getElementById('f-lduration')?.value||1);
   const status=document.getElementById('f-lstatus')?.value;
@@ -1705,7 +1726,7 @@ function openLesson(id){
       <div class="ir"><span class="ir-l">שעה</span><span class="ir-v">${l.time||'—'}</span></div>
       <div class="ir"><span class="ir-l">סוג</span><span class="ir-v">${LESSON_TYPES[l.type]||l.type}</span></div>
       <div class="ir"><span class="ir-l">${l.type==='test'?'מחיר':'יחידות'}</span><span class="ir-v">${l.type==='test'?'₪230':(+l.duration||1)}</span></div>
-      <div class="ir"><span class="ir-l">סטטוס</span><span class="badge ${l.status==='done'?'bg':l.status==='cancelled'?'br':'by'}">${LESSON_STATUS[l.status]||LESSON_STATUS['scheduled']}</span></div>
+      <div class="ir"><span class="ir-l">סטטוס</span><span class="badge ${l.status==='done'?'bg':l.status==='cancelled'?'br':l.status==='failed'?'br':'by'}">${LESSON_STATUS[l.status]||LESSON_STATUS['scheduled']}</span></div>
       ${l.notes?`<div class="ir"><span class="ir-l">הערות</span><span class="ir-v">${l.notes}</span></div>`:''}
     </div>
     <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:6px">שנה סטטוס:</div>
@@ -1717,6 +1738,9 @@ function openLesson(id){
       <button class="btn btn-w btn-full" onclick="updateLessonStatus('${id}','noshow')">⚠️ לא הגיע</button>
       <button class="btn btn-o btn-full" onclick="updateLessonStatus('${id}','scheduled')">🕐 מתוכנן</button>
     </div>
+    ${l.type==='test'?`<div class="frow" style="padding:8px 0 0">
+      <button class="btn btn-full" style="background:#7F1D1D;color:#fff" onclick="updateLessonStatus('${id}','failed')">💔 נכשל</button>
+    </div>`:''}
     <div style="height:1px;background:var(--bd);margin:12px 0"></div>
     <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:6px">פעולות:</div>
     <div class="frow" style="padding:0">
