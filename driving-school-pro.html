@@ -859,7 +859,8 @@ function renderStudentDetail(){
   if(!s) return '<div class="empty"><div class="empty-t">תלמיד לא נמצא</div></div>';
   const bal=calcBalance(s.id);
   const lessons=S.lessons.filter(l=>l.studentId===s.id).sort((a,b)=>b.date.localeCompare(a.date)||((b.time||'').localeCompare(a.time||'')));
-  const done=lessons.filter(l=>l.status==='done'&&l.type==='lesson').length;
+  const doneLessons=lessons.filter(l=>l.status==='done'&&l.type==='lesson');
+  const done=Math.round(doneLessons.reduce((a,l)=>a+(parseFloat(l.duration)||1),0)*10)/10;
   const payments=S.payments.filter(p=>p.studentId===s.id).sort((a,b)=>b.date.localeCompare(a.date));
   const tests=lessons.filter(l=>l.type==='test').sort((a,b)=>a.date.localeCompare(b.date));
   const age=calcAge(s.dob);
