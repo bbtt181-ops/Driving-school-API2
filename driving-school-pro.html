@@ -564,12 +564,14 @@ async function apiLoadAll(){
       const sheetsS = json.data.students || [];
       const sheetsL = json.data.lessons  || [];
       const sheetsP = json.data.payments || [];
-      // אל תדרוס נתונים מקומיים אם יש יותר נתונים מקומית
-      if(sheetsS.length >= S.students.length){
+      // דרוס רק אם ב-Sheets יש לפחות אותו מספר רשומות בכל הטבלאות
+      if(sheetsS.length >= S.students.length &&
+         sheetsL.length >= S.lessons.length  &&
+         sheetsP.length >= S.payments.length){
         S.students = sheetsS;
         S.lessons  = sheetsL.map(cleanLesson);
         S.payments = sheetsP;
-        dbSave(); // cache locally
+        dbSave();
       }
       return true;
     }
@@ -652,7 +654,7 @@ function calcBalance(sid){
 
   if(student.pkg==='per_lesson'){
     // סופר יחידות (לא מספר שיעורים!) — שיעור 2 יח' = 2 יחידות
-    units = ls.filter(l=>l.type==='lesson').reduce((a,l)=>a+(Number(l.duration)||1), 0);
+    units = ls.filter(l=>l.type==='lesson'||l.type==='internal').reduce((a,l)=>a+(Number(l.duration)||1), 0);
     const intLs   = ls.filter(l=>l.type==='internal').length;
     const tstLs   = ls.filter(l=>l.type==='test').length;
     const parkLs  = ls.filter(l=>l.type==='parking').length;
@@ -664,8 +666,8 @@ function calcBalance(sid){
     owed += pkg.price;
     lessonsOwed = pkg.price;
 
-    // יחידות שיעורים רגילים (לפי duration)
-    units = ls.filter(l=>l.type==='lesson').reduce((a,l)=>a+(Number(l.duration)||1), 0);
+    // יחידות שיעורים רגילים + פנימי (לפי duration)
+    units = ls.filter(l=>l.type==='lesson'||l.type==='internal').reduce((a,l)=>a+(Number(l.duration)||1), 0);
     const extraUnits = Math.max(0, units - pkg.lessons);
     const extraCost  = extraUnits * (Number(student.price)||0);
 
@@ -831,7 +833,7 @@ function renderStudents(){
   else if(S.studentFilter==='premium') list=list.filter(s=>s.pkg==='premium');
   else if(S.studentFilter==='per_lesson') list=list.filter(s=>s.pkg==='per_lesson');
   else if(S.studentFilter==='debt') list=list.filter(s=>calcBalance(s.id).debt>0);
-  if(S.searchQ) list=list.filter(s=>s.name.includes(S.searchQ)||(s.phone||'').includes(S.searchQ)||String(s.idNum||s.idnum||'').includes(S.searchQ));
+  if(S.searchQ) list=list.filter(s=>s.name.includes(S.searchQ)||(s.phone||'').includes(S.searchQ)||String(s.idNum||s.idnum||'').includes(S.searchQ)||String(s.idnum||s.idNum||'').includes(S.searchQ));
   list.sort((a,b)=>a.name.localeCompare(b.name,'he'));
 
   const chipsHTML=filters.map(f=>`<button class="chip ${S.studentFilter===f.id?'active':''}" onclick="setFilter('${f.id}')">${f.label}</button>`).join('');
@@ -999,7 +1001,7 @@ function toggleCheck(sid,field){
   const s=S.students.find(x=>x.id===sid);
   if(!s)return;
   s[field]=!s[field];
-  dbSave();
+  dbStudent(s);
   renderContent();
 }
 
@@ -1150,14 +1152,25 @@ function renderCalDay(){
 function lessonCard(l){
   const st=S.students.find(s=>s.id===l.studentId);
   const stIco={done:'✅',cancelled:'❌',noshow:'⚠️',scheduled:'🕐'};
-  return `<div class="lc" onclick="openLesson('${l.id}')">
-    <div class="lt"><div class="lt-t">${l.time||'--:--'}</div><div class="lt-d">${l.type==='test'?'₪230':(+l.duration||1)+' יח\''}</div></div>
-    <div class="li"><div class="li-n">${st?st.name:'?'}</div>
-    <div class="li-m"><span class="badge bgr">${LESSON_TYPES[l.type]||l.type}</span></div></div>
+  const typeColors={
+    lesson:  {bg:'#3B1FA3',border:'#6D4FD6'},
+    test:    {bg:'#92400E',border:'#F59E0B'},
+    internal:{bg:'#064E3B',border:'#10B981'},
+    parking: {bg:'#1E3A5F',border:'#3B82F6'}
+  };
+  const c=typeColors[l.type]||typeColors.lesson;
+  const dur=l.type==='test'?'₪230':(+l.duration||1)+' יח\'';
+  const noteTxt=l.notes?`<div style="font-size:11px;opacity:.8;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:165px">${l.notes}</div>`:'';
+  return `<div class="lc" onclick="openLesson('${l.id}')" style="background:${c.bg};border:1.5px solid ${c.border};color:#fff">
+    <div class="lt"><div class="lt-t" style="color:rgba(255,255,255,.9)">${l.time||'--:--'}</div><div class="lt-d" style="color:rgba(255,255,255,.7)">${dur}</div></div>
+    <div class="li" style="flex:1">
+      <div class="li-n" style="color:#fff;font-weight:700">${st?st.name:'?'}</div>
+      ${noteTxt}
+      <div class="li-m"><span style="background:rgba(255,255,255,.15);color:#fff;font-size:10px;padding:2px 7px;border-radius:4px">${LESSON_TYPES[l.type]||l.type}</span></div>
+    </div>
     <div class="ls">${stIco[l.status]||'🕐'}</div>
   </div>`;
 }
-
 function calPrev(){
   const v=S.calView||'month';
   if(v==='month') S.calDate=new Date(S.calDate.getFullYear(),S.calDate.getMonth()-1,1);
@@ -1405,6 +1418,7 @@ function showEditStudent(id){
         <option value="cash"     ${s?.regPaid==='cash'?'selected':''}>✓ שולם — מזומן</option>
         <option value="transfer" ${s?.regPaid==='transfer'?'selected':''}>✓ שולם — העברה בנקאית</option>
         <option value="bit"      ${s?.regPaid==='bit'?'selected':''}>✓ שולם — Bit</option>
+        <option value="paybox"   ${s?.regPaid==='paybox'?'selected':''}>✓ שולם — PayBox</option>
         <option value="check"    ${s?.regPaid==='check'?'selected':''}>✓ שולם — צ'ק</option>
       </select>
     </div>
@@ -1622,6 +1636,7 @@ function showAddPayment(studentId=null){
         <option value="cash">מזומן</option>
         <option value="transfer">העברה בנקאית</option>
         <option value="bit">Bit</option>
+        <option value="paybox">PayBox</option>
         <option value="check">צ'ק</option>
       </select>
     </div>
@@ -1644,6 +1659,14 @@ function savePayment(){
   if(!amt||amt<=0){toast('יש להזין סכום','err');return;}
   if(!date){toast('יש להזין תאריך','err');return;}
   const receiptNum=document.getElementById('f-preceipt')?.value||null;
+  if(receiptNum){
+    const dup=S.payments.find(p=>p.receiptNum&&String(p.receiptNum)===String(receiptNum));
+    if(dup){
+      const dupSt=S.students.find(s=>s.id===dup.studentId);
+      toast(`קבלה #${receiptNum} כבר קיימת — ${dupSt?dupSt.name:''}  ${fmtDate(dup.date)}`,'err');
+      return;
+    }
+  }
   const payment={id:uid(),studentId:sid,amount:amt,date,method,notes:notes||null,receiptNum:receiptNum||null};
   dbPayment(payment);
   closeModal();
@@ -2278,6 +2301,7 @@ function editPayment(id){
         <option value="cash" ${p.method==='cash'?'selected':''}>מזומן</option>
         <option value="transfer" ${p.method==='transfer'?'selected':''}>העברה בנקאית</option>
         <option value="bit" ${p.method==='bit'?'selected':''}>Bit</option>
+        <option value="paybox" ${p.method==='paybox'?'selected':''}>PayBox</option>
         <option value="check" ${p.method==='check'?'selected':''}>צ'ק</option>
       </select>
     </div>
