@@ -380,6 +380,7 @@ function showApiSettings(){
   </div>
   <div style="padding:0 16px 16px">
     <button class="btn btn-full" style="margin-top:8px;background:var(--bg2);color:var(--t1);border:1px solid var(--br)" onclick="closeModal();setTimeout(showCsvImport,200)">📥 ייבוא מגיליון ישן (CSV)</button>
+    <button class="btn btn-full" style="margin-top:8px;background:#1E40AF;color:#fff" onclick="forceSyncToSheets()">☁️ דחוף הכל לשיטס</button>
     <button class="btn btn-d btn-full" style="margin-top:8px" onclick="confirmClearAll()">🗑️ נקה את כל הנתונים</button>
   </div>`);
 }
@@ -402,6 +403,22 @@ function confirmClearAll(){
     <button class="btn btn-o" onclick="closeModal()">ביטול</button>
     <button class="btn btn-d" style="flex:1" onclick="clearAllData()">כן, מחק הכל</button>
   </div>`);
+}
+
+async function forceSyncToSheets(){
+  if(!hasAPI()){toast('אין API מחובר','err');return;}
+  closeModal();
+  toast('⟳ מסנכרן הכל לשיטס...','');
+  try{
+    await fetch(API_URL,{credentials:'omit',method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'saveAll',type:'all',
+        data:{students:S.students,lessons:S.lessons,payments:S.payments}})
+    });
+    toast('✅ כל הנתונים נדחפו לשיטס','ok');
+  }catch(e){
+    toast('❌ שגיאת סנכרון','err');
+  }
 }
 
 async function clearAllData(){
