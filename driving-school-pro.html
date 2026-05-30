@@ -2345,10 +2345,13 @@ function _extractCsvStudents(rows,hi){
   const out=[];
   for(let i=hi+1;i<rows.length;i++){
     const r=rows[i];
-    if(!r||!r[0]||!/^\d+$/.test(r[0].trim())) continue;
+    if(!r) continue;
+    // קבל שורות עם מספר בעמודה A, או בלי מספר אם יש שם+ת"ז
+    const hasRowNum=r[0]&&/^\d+$/.test(r[0].trim());
     const name=`${(r[1]||'').trim()} ${(r[2]||'').trim()}`.replace(/\s+/g,' ').trim();
     const idNum=(r[3]||'').trim();
-    if(!idNum||!name) continue;
+    if(!hasRowNum&&(!idNum||!name)) continue;
+    if(hasRowNum&&(!idNum||!name)) continue;
     const dobRaw=(r[4]||'').trim();
     let dob='';
     if(dobRaw){const p=dobRaw.split('/');if(p.length===3)dob=`${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;}
