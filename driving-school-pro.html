@@ -2363,7 +2363,10 @@ function _extractCsvStudents(rows,hi){
     const theory=(r[13]||'').trim()==='כן';
     const doctorCheck=(r[14]||'').trim().toUpperCase()==='TRUE'||(r[14]||'').trim()==='כן';
     const eyeCheck=(r[15]||'').trim().toUpperCase()==='TRUE'||(r[15]||'').trim()==='כן';
-    out.push({name,idNum,dob,phone,email,status,regFee:registrationFee,theory,health:doctorCheck,vision:eyeCheck});
+    const parking=(r[16]||'').trim().toUpperCase()==='TRUE'||(r[16]||'').trim()==='כן';
+    const internal=(r[17]||'').trim()==='כן'||(r[17]||'').trim().toUpperCase()==='TRUE';
+    const regPaid=registrationFee>0?'cash':'';
+    out.push({name,idNum,dob,phone,email,status,regFee:registrationFee,regPaid,theory,health:doctorCheck,vision:eyeCheck,parking,internal});
   }
   return out;
 }
@@ -2527,6 +2530,8 @@ function runCsvImport(){
         if(r.csvS.theory) r.existing.theory=r.csvS.theory;
         if(r.csvS.health) r.existing.health=r.csvS.health;
         if(r.csvS.vision) r.existing.vision=r.csvS.vision;
+        if(r.csvS.parking) r.existing.parking=r.csvS.parking;
+        if(r.csvS.internal) r.existing.internal=r.csvS.internal;
         dbStudent(r.existing);updS++;
       }
     }
