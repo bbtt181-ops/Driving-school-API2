@@ -2456,6 +2456,7 @@ async function previewCsvImport(files){
     const name=csvS?csvS.name:(existing?existing.name:`ת״ז ${id}`);
     const lessonsTotal=csvS?csvS.lessonsTotal||0:0;
     previewRows.push({id,name,csvS,existing,newPays,status,label,detail,lessonsTotal});
+  });
 
   const newCnt=previewRows.filter(r=>r.status==='new').length;
   const updCnt=previewRows.filter(r=>r.status==='update').length;
@@ -2500,7 +2501,9 @@ function runCsvImport(){
   previewRows.forEach(r=>{
     let sid=null;
     if(r.status==='new'&&r.csvS){
-      const st={...r.csvS,id:uid()};
+      const ptMap={package:'basic',perUnit:'per_lesson'};
+      const pkg=ptMap[r.csvS.pricingType]||'per_lesson';
+      const st={...r.csvS,id:uid(),pkg};
       dbStudent(st);sid=st.id;newS++;
     }else if((r.status==='update'||r.status==='orphan')&&r.existing){
       sid=r.existing.id;
