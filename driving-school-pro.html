@@ -2439,7 +2439,7 @@ async function previewCsvImport(files){
   S.students.forEach(s=>idToExisting[String(s.idNum||s.idnum||'')]=s);
   const payByIdNum={};
   csvPayments.forEach(p=>{if(!payByIdNum[p.idNum])payByIdNum[p.idNum]=[];payByIdNum[p.idNum].push(p);});
-  const allIds=new Set([...csvStudents.map(s=>s.idNum),...Object.keys(payByIdNum)]);
+  const allIds=new Set([...csvStudents.map(s=>s.idNum),...Object.keys(payByIdNum),...Object.keys(csvFinance)]);
 
   const previewRows=[];
   allIds.forEach(id=>{
