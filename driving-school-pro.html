@@ -558,10 +558,16 @@ async function apiLoadAll(){
     const res  = await fetch(API_URL + '?action=getAll', { credentials:'omit' });
     const json = await res.json();
     if(json.ok && json.data){
-      S.students = json.data.students || [];
-      S.lessons  = (json.data.lessons  || []).map(cleanLesson);
-      S.payments = json.data.payments || [];
-      dbSave(); // cache locally
+      const sheetsS = json.data.students || [];
+      const sheetsL = json.data.lessons  || [];
+      const sheetsP = json.data.payments || [];
+      // אל תדרוס נתונים מקומיים אם יש יותר נתונים מקומית
+      if(sheetsS.length >= S.students.length){
+        S.students = sheetsS;
+        S.lessons  = sheetsL.map(cleanLesson);
+        S.payments = sheetsP;
+        dbSave(); // cache locally
+      }
       return true;
     }
   } catch(e){ console.warn('Sheets load error:', e); }
