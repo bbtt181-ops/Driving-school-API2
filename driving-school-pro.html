@@ -1262,7 +1262,8 @@ function renderOccasional(){
     <div class="tabs-row">${tabsHTML}</div>
     <div style="border:1px solid var(--br);border-radius:10px;overflow:hidden;margin-top:8px">
       ${S.occasionalTab==='lessons'?lessonsHTML:paysHTML}
-    </div>`;
+    </div>
+    <button class="btn btn-full" style="margin-top:12px;background:#22c55e;color:#fff" onclick="importOccasionalToStudent()">✅ ייבא לאפ</button>`;
   }
 
   return `<div style="padding:12px 16px">
@@ -1282,6 +1283,39 @@ function renderOccasional(){
     </div>
     ${resultsHTML}
   </div>`;
+}
+
+function importOccasionalToStudent(){
+  if(!S.occasionalData) return;
+  const name=(S.occasionalName||'').trim();
+  // חיפוש תלמיד לפי שם
+  const student=S.students.find(s=>s.name===name||s.name.includes(name)||name.includes(s.name));
+  if(!student){toast('תלמיד לא נמצא באפ — בדוק את השם','err');return;}
+
+  const {lessons,payments}=S.occasionalData;
+  let addedL=0,addedP=0;
+
+  // ייבא שיעורים — בדוק כפילויות לפי תאריך+שעה
+  lessons.forEach(l=>{
+    const dup=S.lessons.some(x=>x.studentId===student.id&&x.date===l.date&&x.time===l.time);
+    if(!dup){
+      dbLesson({id:uid(),studentId:student.id,date:l.date,time:l.time,type:l.type,duration:l.duration,status:'done',notes:l.notes||''});
+      addedL++;
+    }
+  });
+
+  // ייבא תשלומים — בדוק כפילויות לפי תאריך+סכום+קבלה
+  payments.forEach(p=>{
+    const dup=S.payments.some(x=>x.studentId===student.id&&x.date===p.date&&x.amount===p.amount&&(p.receiptNum?x.receiptNum===p.receiptNum:true));
+    if(!dup){
+      dbPayment({id:uid(),studentId:student.id,date:p.date,amount:p.amount,method:p.method||'cash',receiptNum:p.receiptNum||'',notes:'ייבוא יומן'});
+      addedP++;
+    }
+  });
+
+  dbSave();
+  toast(`✅ נוספו ${addedL} שיעורים + ${addedP} תשלומים ל${student.name}`,'ok');
+  navigate('student-detail', student.id);
 }
 
 async function fetchCalendarEvents(){
