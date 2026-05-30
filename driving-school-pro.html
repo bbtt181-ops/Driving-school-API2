@@ -2418,7 +2418,7 @@ async function previewCsvImport(files){
     if(det) parsed[det.type]={rows,hi:det.hi};
   }
 
-  if(!parsed.students&&!parsed.payments){
+  if(!parsed.students&&!parsed.payments&&!parsed.finance){
     prev.innerHTML='<div class="alert-box alert-r"><div class="alert-ico">⚠️</div><div class="alert-txt">לא זוהו קבצים תקינים. ודא שהקבצים הם: תלמידים / כספים / היסטוריית תשלומים.</div></div>';
     return;
   }
