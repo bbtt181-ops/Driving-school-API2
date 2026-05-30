@@ -2363,7 +2363,7 @@ function _extractCsvStudents(rows,hi){
     const theory=(r[13]||'').trim()==='כן';
     const doctorCheck=(r[14]||'').trim().toUpperCase()==='TRUE'||(r[14]||'').trim()==='כן';
     const eyeCheck=(r[15]||'').trim().toUpperCase()==='TRUE'||(r[15]||'').trim()==='כן';
-    out.push({name,idNum,dob,phone,email,status,registrationFee,theory,doctorCheck,eyeCheck});
+    out.push({name,idNum,dob,phone,email,status,regFee:registrationFee,theory,health:doctorCheck,vision:eyeCheck});
   }
   return out;
 }
@@ -2523,10 +2523,10 @@ function runCsvImport(){
         if(r.csvS.packagePrice) r.existing.packagePrice=r.csvS.packagePrice;
         if(!r.existing.dob&&r.csvS.dob) r.existing.dob=r.csvS.dob;
         if(!r.existing.email&&r.csvS.email) r.existing.email=r.csvS.email;
-        if(r.csvS.registrationFee) r.existing.registrationFee=r.csvS.registrationFee;
+        if(r.csvS.regFee) r.existing.regFee=r.csvS.regFee;
         if(r.csvS.theory) r.existing.theory=r.csvS.theory;
-        if(r.csvS.doctorCheck) r.existing.doctorCheck=r.csvS.doctorCheck;
-        if(r.csvS.eyeCheck) r.existing.eyeCheck=r.csvS.eyeCheck;
+        if(r.csvS.health) r.existing.health=r.csvS.health;
+        if(r.csvS.vision) r.existing.vision=r.csvS.vision;
         dbStudent(r.existing);updS++;
       }
     }
