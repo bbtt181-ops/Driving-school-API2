@@ -877,7 +877,7 @@ function renderStudents(){
 }
 
 function setFilter(f){ S.studentFilter=f; renderContent(); }
-function searchStudents(q){ S.searchQ=q; renderContent(); const inp=document.getElementById('search-q');if(inp){inp.focus();inp.setSelectionRange(q.length,q.length);} }
+function searchStudents(q){ S.searchQ=q; renderContent(); setTimeout(()=>{const inp=document.getElementById('search-q');if(inp){inp.focus();inp.setSelectionRange(q.length,q.length);}},0); }
 function openStudent(id){ S.selStudent=id; S.detailTab='overview'; navigate('student-detail',id); }
 
 // ═══════════════════════════════════════════════
@@ -1349,6 +1349,14 @@ function importOccasionalToStudent(){
 
   dbSave();
   toast(`✅ נוספו ${addedL} שיעורים + ${addedP} תשלומים ל${student.name}`,'ok');
+  // סנכרן הכל לשיטס ברקע כדי שהנתונים לא ייאבדו בריענון
+  if(hasAPI()){
+    fetch(API_URL,{credentials:'omit',method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'saveAll',type:'all',
+        data:{students:S.students,lessons:S.lessons,payments:S.payments}})
+    }).catch(e=>console.warn('Sync after import failed:',e));
+  }
   navigate('student-detail', student.id);
 }
 
