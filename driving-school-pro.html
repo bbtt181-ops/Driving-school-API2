@@ -850,7 +850,7 @@ function renderStudents(){
   else if(S.studentFilter==='premium') list=list.filter(s=>s.pkg==='premium');
   else if(S.studentFilter==='per_lesson') list=list.filter(s=>s.pkg==='per_lesson');
   else if(S.studentFilter==='debt') list=list.filter(s=>calcBalance(s.id).debt>0);
-  if(S.searchQ){const q=S.searchQ.replace(/[-\s]/g,'');list=list.filter(s=>(s.name||'').toLowerCase().includes(S.searchQ.toLowerCase())||((s.phone||'').replace(/[-\s]/g,'')).includes(q)||String(s.idnum||s.idNum||'').includes(q));}
+  if(S.searchQ){const q=S.searchQ.replace(/[-\s]/g,'');list=list.filter(s=>(s.name||'').toLowerCase().includes(S.searchQ.toLowerCase())||(String(s.phone||'').replace(/[-\s]/g,'')).includes(q)||String(s.idnum||s.idNum||'').includes(q));}
   list.sort((a,b)=>a.name.localeCompare(b.name,'he'));
 
   const chipsHTML=filters.map(f=>`<button class="chip ${S.studentFilter===f.id?'active':''}" onclick="setFilter('${f.id}')">${f.label}</button>`).join('');
