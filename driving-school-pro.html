@@ -549,6 +549,8 @@ function dbLoad(){
   S.students = JSON.parse(localStorage.getItem('dp_s')||'[]');
   S.lessons  = (JSON.parse(localStorage.getItem('dp_l')||'[]')).map(cleanLesson);
   S.payments = JSON.parse(localStorage.getItem('dp_p')||'[]');
+  const occ = JSON.parse(localStorage.getItem('dp_occ')||'null');
+  if(occ){ S.occasionalData=occ.data; S.occasionalName=occ.name||''; S.occasionalFrom=occ.from||''; S.occasionalTo=occ.to||''; }
 }
 
 // שמירה מקומית
@@ -556,6 +558,7 @@ function dbSave(){
   localStorage.setItem('dp_s', JSON.stringify(S.students));
   localStorage.setItem('dp_l', JSON.stringify(S.lessons));
   localStorage.setItem('dp_p', JSON.stringify(S.payments));
+  if(S.occasionalData) localStorage.setItem('dp_occ', JSON.stringify({data:S.occasionalData,name:S.occasionalName,from:S.occasionalFrom,to:S.occasionalTo}));
 }
 
 // ─── Google Sheets API ───
@@ -666,6 +669,7 @@ function calcBalance(sid){
   // דמי רישום — נכנסים לחוב רק אם טרם שולמו בנפרד
   const regOwed = (!student.regPaid) ? (Number(student.regFee)||0) : 0;
   let owed = regOwed;
+  if(student.internal) owed += INTERNAL_PRICE; // ₪50 חד-פעמי — מבחן פנימי
   let lessonsOwed = 0;
   let units = 0;
 
@@ -1395,6 +1399,8 @@ async function fetchCalendarEvents(){
     if(json.ok){
       S.occasionalData=json.data;
       S.occasionalTab='lessons';
+      dbSave();
+      navigate('occasional');
       renderContent();
       toast(`נמצאו ${json.data.lessons?.length||0} שיעורים`,'ok');
     }else{
