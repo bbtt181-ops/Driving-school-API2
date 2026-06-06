@@ -2127,6 +2127,7 @@ function printStudentReport(sid){
   const bal=calcBalance(sid);
   const lessons=S.lessons.filter(l=>l.studentId===sid).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time||''));
   const payments=S.payments.filter(p=>p.studentId===sid).sort((a,b)=>a.date.localeCompare(b.date));
+  const doneUnits=lessons.filter(l=>l.status==='done'&&(l.type==='lesson'||l.type==='internal')).reduce((a,l)=>a+(Number(l.duration)||1),0);
   const TYPES={lesson:'שיעור',internal:'מבחן פנימי',test:'טסט',parking:'חניות',event:'אחר'};
   const STATUS={done:'בוצע',cancelled:'בוטל',noshow:'לא הגיע',scheduled:'מתוכנן',failed:'נכשל'};
   const lessonRows=lessons.map((l,i)=>{
@@ -2153,19 +2154,21 @@ function printStudentReport(sid){
   const debtLabel=bal.debt>0?`חוב: ₪${bal.debt.toLocaleString()}`:bal.debt<0?`זכות: ₪${Math.abs(bal.debt).toLocaleString()}`:'מאוזן ✓';
   const html=`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
   <title>דוח תלמיד — ${s.name}</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:16mm 14mm}
+    body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:12px}
+    @media(min-width:600px){body{padding:16mm 14mm}}
     @page{size:A4;margin:16mm 14mm}
     @media print{.no-print{display:none!important}}
     h1{font-size:20px;font-weight:700;color:#1E40AF;margin-bottom:2px}
     .sub{font-size:11px;color:#666;margin-bottom:12px}
-    .student-card{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;background:#f1f5f9;border-radius:8px;padding:10px 14px;margin-bottom:14px;border:1px solid #e2e8f0}
+    .student-card{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;background:#f1f5f9;border-radius:8px;padding:10px 14px;margin-bottom:14px;border:1px solid #e2e8f0}
     .field{display:flex;flex-direction:column}
     .field-l{font-size:10px;color:#64748b;font-weight:600}
     .field-v{font-size:13px;font-weight:700;color:#0f172a}
-    .balance-bar{display:flex;gap:12px;margin-bottom:14px}
-    .bal{flex:1;border-radius:8px;padding:8px 12px;text-align:center;border:1px solid #e2e8f0}
+    .balance-bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+    .bal{flex:1;min-width:80px;border-radius:8px;padding:8px 10px;text-align:center;border:1px solid #e2e8f0}
     .bal-v{font-size:16px;font-weight:700}
     .bal-l{font-size:10px;color:#666}
     h2{font-size:13px;font-weight:700;color:#1E40AF;border-bottom:2px solid #1E40AF;padding-bottom:3px;margin:12px 0 6px}
@@ -2196,9 +2199,9 @@ function printStudentReport(sid){
     <div class="bal"><div class="bal-v" style="color:#1E40AF">₪${bal.owed.toLocaleString()}</div><div class="bal-l">לתשלום</div></div>
     <div class="bal"><div class="bal-v" style="color:#15803d">₪${bal.paid.toLocaleString()}</div><div class="bal-l">שולם</div></div>
     <div class="bal"><div class="bal-v" style="color:${debtColor}">${debtLabel}</div><div class="bal-l">יתרה</div></div>
-    <div class="bal"><div class="bal-v">${lessons.length}</div><div class="bal-l">שיעורים</div></div>
+    <div class="bal"><div class="bal-v">${doneUnits}</div><div class="bal-l">יחידות</div></div>
   </div>
-  <h2>שיעורים (${lessons.length})</h2>
+  <h2>שיעורים (${lessons.length} רשומות | ${doneUnits} יחידות)</h2>
   <table><thead><tr><th>#</th><th>תאריך</th><th>שעה</th><th>סוג</th><th>יח'</th><th>סטטוס</th><th>חיוב</th><th>הערות</th></tr></thead>
   <tbody>${lessonRows}</tbody>
   <tfoot><tr style="font-weight:700;background:#f1f5f9"><td colspan="6">סה"כ לתשלום</td><td>₪${bal.owed.toLocaleString()}</td><td></td></tr></tfoot></table>
@@ -2235,8 +2238,11 @@ function printBalanceReport(){
   const totalDebt=active.reduce((a,s)=>{ const d=calcBalance(s.id).debt; return a+(d>0?d:0); },0);
   const html=`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
   <title>דוח יתרות — דרייב פרו</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
-    body{font-family:Arial,sans-serif;font-size:13px;margin:20px;color:#111}
+    body{font-family:Arial,sans-serif;font-size:12px;margin:12px;color:#111}
+    @media(min-width:600px){body{font-size:13px;margin:20px}}
+    table{table-layout:fixed;word-break:break-word}
     @page{size:A4;margin:16mm 14mm}
     @media print{.no-print{display:none!important}}
     h1{font-size:18px;margin:0 0 4px}
@@ -2299,13 +2305,15 @@ function printPeriodReport(){
   }).join('');
   const html=`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
   <title>דוח מאזן — דרייב פרו</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <style>
-    body{font-family:Arial,sans-serif;font-size:13px;margin:20px;color:#111}
+    body{font-family:Arial,sans-serif;font-size:12px;margin:12px;color:#111}
+    @media(min-width:600px){body{font-size:13px;margin:20px}}
     h1{font-size:18px;margin:0 0 4px}
     h2{font-size:14px;margin:16px 0 8px;color:#1E40AF;border-bottom:2px solid #1E40AF;padding-bottom:4px}
     .sub{color:#666;font-size:12px;margin:0 0 16px}
-    .kpis{display:flex;gap:16px;margin-bottom:16px}
-    .kpi{background:#f1f5f9;border-radius:8px;padding:10px 16px;flex:1;text-align:center}
+    .kpis{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+    .kpi{background:#f1f5f9;border-radius:8px;padding:10px 16px;flex:1;min-width:80px;text-align:center}
     .kpi-v{font-size:20px;font-weight:700;color:#1E40AF}
     .kpi-l{font-size:11px;color:#666}
     table{width:100%;border-collapse:collapse;margin-bottom:16px}
@@ -2345,15 +2353,8 @@ function printPeriodReport(){
 }
 
 function _injectPdf(w, contentId, filename){
-  const s=w.document.createElement('script');
-  s.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-  s.onload=function(){
-    const btn=w.document.getElementById('btn-pdf');
-    if(btn) btn.onclick=function(){
-      w.html2pdf().set({margin:[10,10,10,10],filename:filename+'.pdf',html2canvas:{scale:2,useCORS:true},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(w.document.getElementById(contentId)).save();
-    };
-  };
-  w.document.head.appendChild(s);
+  const btn=w.document.getElementById('btn-pdf');
+  if(btn) btn.onclick=function(){ w.print(); };
 }
 
 async function appInit(){
