@@ -2078,6 +2078,12 @@ function renderReports(){
       <button class="btn btn-p btn-full" onclick="printBalanceReport()">🖨️ הדפסת דוח יתרות</button>
     </div>
     <div class="card cp" style="margin:0 0 12px">
+      <div class="fw7" style="margin-bottom:10px;font-size:14px">דוח שיעורים ותשלומים לתלמיד</div>
+      <p style="font-size:12px;color:var(--t2);margin:0 0 10px">הזן שם תלמיד או מספר זהות — יופק דוח A4 עם פרטי תלמיד, שיעורים ותשלומים</p>
+      <input class="fi" id="rep-student-q" type="text" placeholder="שם / מספר זהות..." oninput="repStudentSearch(this.value)" style="margin-bottom:8px">
+      <div id="rep-student-results" style="font-size:13px;color:var(--t2)"></div>
+    </div>
+    <div class="card cp" style="margin:0 0 12px">
       <div class="fw7" style="margin-bottom:10px;font-size:14px">דוח מאזן לתקופה</div>
       <div style="display:flex;gap:10px;margin-bottom:10px">
         <div class="fg" style="flex:1"><label class="fl">מתאריך</label>
@@ -2090,6 +2096,108 @@ function renderReports(){
       <button class="btn btn-p btn-full" onclick="printPeriodReport()">🖨️ הדפסת דוח מאזן</button>
     </div>
   </div>`;
+}
+
+function repStudentSearch(q){
+  const el=document.getElementById('rep-student-results');
+  if(!el) return;
+  if(!q||q.length<2){el.innerHTML='';return;}
+  const qc=q.replace(/[-\s]/g,'').toLowerCase();
+  const found=S.students.filter(s=>
+    (s.name||'').toLowerCase().includes(q.toLowerCase())||
+    String(s.idnum||s.idNum||'').replace(/[-\s]/g,'').includes(qc)||
+    String(s.phone||'').replace(/[-\s]/g,'').includes(qc)
+  );
+  if(found.length===0){el.innerHTML='<div style="color:var(--er)">לא נמצא תלמיד</div>';return;}
+  el.innerHTML=found.map(s=>`<div style="padding:6px 0;border-bottom:1px solid var(--bd);cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="printStudentReport('${s.id}')">
+    <span><b>${s.name}</b> ${s.idnum?'· ת"ז '+s.idnum:''}</span>
+    <button class="btn btn-p btn-sm">🖨️ הפק</button>
+  </div>`).join('');
+}
+
+function printStudentReport(sid){
+  const s=S.students.find(x=>x.id===sid);
+  if(!s) return;
+  const bal=calcBalance(sid);
+  const lessons=S.lessons.filter(l=>l.studentId===sid).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time||''));
+  const payments=S.payments.filter(p=>p.studentId===sid).sort((a,b)=>a.date.localeCompare(b.date));
+  const TYPES={lesson:'שיעור',internal:'מבחן פנימי',test:'טסט',parking:'חניות',event:'אחר'};
+  const STATUS={done:'בוצע',cancelled:'בוטל',noshow:'לא הגיע',scheduled:'מתוכנן',failed:'נכשל'};
+  const lessonRows=lessons.map((l,i)=>{
+    const price=l.status==='done'?lessonPrice(l,s):0;
+    return `<tr>
+      <td style="text-align:center">${i+1}</td>
+      <td>${l.date}</td>
+      <td>${l.time||'—'}</td>
+      <td>${TYPES[l.type]||l.type}</td>
+      <td style="text-align:center">${l.type==='test'?'—':l.duration||1}</td>
+      <td>${STATUS[l.status]||l.status}</td>
+      <td style="text-align:left">${price?'₪'+price.toLocaleString():'—'}</td>
+      <td style="font-size:11px;color:#555">${l.notes||''}</td>
+    </tr>`;
+  }).join('');
+  const payRows=payments.map(p=>`<tr>
+    <td>${p.date}</td>
+    <td style="text-align:left;font-weight:700;color:#15803d">₪${Number(p.amount||0).toLocaleString()}</td>
+    <td>${p.method||'—'}</td>
+    <td>${p.receipt||''}</td>
+    <td style="font-size:11px;color:#555">${p.notes||''}</td>
+  </tr>`).join('');
+  const debtColor=bal.debt>0?'#b91c1c':bal.debt<0?'#15803d':'#15803d';
+  const debtLabel=bal.debt>0?`חוב: ₪${bal.debt.toLocaleString()}`:bal.debt<0?`זכות: ₪${Math.abs(bal.debt).toLocaleString()}`:'מאוזן ✓';
+  const html=`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
+  <title>דוח תלמיד — ${s.name}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:16mm 14mm}
+    @page{size:A4;margin:16mm 14mm}
+    @media print{.no-print{display:none!important}}
+    h1{font-size:20px;font-weight:700;color:#1E40AF;margin-bottom:2px}
+    .sub{font-size:11px;color:#666;margin-bottom:12px}
+    .student-card{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;background:#f1f5f9;border-radius:8px;padding:10px 14px;margin-bottom:14px;border:1px solid #e2e8f0}
+    .field{display:flex;flex-direction:column}
+    .field-l{font-size:10px;color:#64748b;font-weight:600}
+    .field-v{font-size:13px;font-weight:700;color:#0f172a}
+    .balance-bar{display:flex;gap:12px;margin-bottom:14px}
+    .bal{flex:1;border-radius:8px;padding:8px 12px;text-align:center;border:1px solid #e2e8f0}
+    .bal-v{font-size:16px;font-weight:700}
+    .bal-l{font-size:10px;color:#666}
+    h2{font-size:13px;font-weight:700;color:#1E40AF;border-bottom:2px solid #1E40AF;padding-bottom:3px;margin:12px 0 6px}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    th{background:#1E40AF;color:#fff;padding:6px 8px;text-align:right;font-size:11px}
+    td{padding:5px 8px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+    tr:nth-child(even) td{background:#f8fafc}
+    .btn-print{display:inline-block;margin-bottom:12px;padding:6px 16px;background:#1E40AF;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px}
+  </style></head><body>
+  <button class="btn-print no-print" onclick="window.print()">🖨️ הדפס</button>
+  <h1>דוח תלמיד — ${s.name}</h1>
+  <p class="sub">הופק: ${new Date().toLocaleDateString('he-IL')} | בית ספר לנהיגה ברוך תור</p>
+  <div class="student-card">
+    <div class="field"><span class="field-l">שם מלא</span><span class="field-v">${s.name||'—'}</span></div>
+    <div class="field"><span class="field-l">מספר זהות</span><span class="field-v">${s.idnum||s.idNum||'—'}</span></div>
+    <div class="field"><span class="field-l">טלפון</span><span class="field-v">${s.phone||'—'}</span></div>
+    <div class="field"><span class="field-l">תאריך לידה</span><span class="field-v">${s.dob||'—'}</span></div>
+    <div class="field"><span class="field-l">מחיר ליחידה</span><span class="field-v">₪${s.price||0}</span></div>
+    <div class="field"><span class="field-l">סטטוס</span><span class="field-v">${s.status==='active'?'פעיל':'לא פעיל'}</span></div>
+  </div>
+  <div class="balance-bar">
+    <div class="bal"><div class="bal-v" style="color:#1E40AF">₪${bal.owed.toLocaleString()}</div><div class="bal-l">לתשלום</div></div>
+    <div class="bal"><div class="bal-v" style="color:#15803d">₪${bal.paid.toLocaleString()}</div><div class="bal-l">שולם</div></div>
+    <div class="bal"><div class="bal-v" style="color:${debtColor}">${debtLabel}</div><div class="bal-l">יתרה</div></div>
+    <div class="bal"><div class="bal-v">${lessons.length}</div><div class="bal-l">שיעורים</div></div>
+  </div>
+  <h2>שיעורים (${lessons.length})</h2>
+  <table><thead><tr><th>#</th><th>תאריך</th><th>שעה</th><th>סוג</th><th>יח'</th><th>סטטוס</th><th>חיוב</th><th>הערות</th></tr></thead>
+  <tbody>${lessonRows}</tbody>
+  <tfoot><tr style="font-weight:700;background:#f1f5f9"><td colspan="6">סה"כ לתשלום</td><td>₪${bal.owed.toLocaleString()}</td><td></td></tr></tfoot></table>
+  <h2>תשלומים (${payments.length})</h2>
+  <table><thead><tr><th>תאריך</th><th>סכום</th><th>אמצעי</th><th>קבלה</th><th>הערות</th></tr></thead>
+  <tbody>${payRows}</tbody>
+  <tfoot><tr style="font-weight:700;background:#f1f5f9"><td>סה"כ שולם</td><td>₪${bal.paid.toLocaleString()}</td><td></td><td></td><td></td></tr></tfoot></table>
+  </body></html>`;
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
 }
 
 function printBalanceReport(){
