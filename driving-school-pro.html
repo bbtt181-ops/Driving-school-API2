@@ -2176,11 +2176,10 @@ function printStudentReport(sid){
     .btn-print{display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;padding:7px 16px;background:#1E40AF;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-left:8px}
     .btn-pdf{background:#15803d}
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   </head><body>
   <div class="no-print" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
     <button class="btn-print" onclick="window.print()">🖨️ הדפס</button>
-    <button class="btn-print btn-pdf" onclick="savePDF('student-report','דוח_תלמיד_${s.name.replace(/\\s+/g,\'_\')}')">📥 שמור PDF</button>
+    <button class="btn-print btn-pdf" id="btn-pdf">📥 שמור PDF</button>
   </div>
   <div id="student-report">
   <h1>דוח תלמיד — ${s.name}</h1>
@@ -2208,16 +2207,11 @@ function printStudentReport(sid){
   <tbody>${payRows}</tbody>
   <tfoot><tr style="font-weight:700;background:#f1f5f9"><td>סה"כ שולם</td><td>₪${bal.paid.toLocaleString()}</td><td></td><td></td><td></td></tr></tfoot></table>
   </div>
-  <script>
-  function savePDF(id,name){
-    const el=document.getElementById(id);
-    html2pdf().set({margin:[10,10,10,10],filename:name+'.pdf',html2canvas:{scale:2,useCORS:true},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(el).save();
-  }
-  </script>
   </body></html>`;
   const w=window.open('','_blank');
   w.document.write(html);
   w.document.close();
+  _injectPdf(w,'student-report','דוח_תלמיד_'+s.name.replace(/\s+/g,'_'));
 }
 
 function printBalanceReport(){
@@ -2255,11 +2249,10 @@ function printBalanceReport(){
     tr:nth-child(even) td{background:#f8fafc}
     .tot{background:#f1f5f9;font-weight:700}
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   </head><body>
   <div class="no-print" style="margin-bottom:12px;display:flex;gap:8px">
     <button class="btn-r" onclick="window.print()">🖨️ הדפס</button>
-    <button class="btn-r btn-g" onclick="html2pdf().set({margin:[10,10,10,10],filename:'דוח_יתרות.pdf',html2canvas:{scale:2},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(document.getElementById('rc')).save()">📥 שמור PDF</button>
+    <button class="btn-r btn-g" id="btn-pdf">📥 שמור PDF</button>
   </div>
   <div id="rc">
   <h1>דוח יתרת חוב — בית ספר לנהיגה ברוך תור</h1>
@@ -2274,6 +2267,7 @@ function printBalanceReport(){
   const w=window.open('','_blank');
   w.document.write(html);
   w.document.close();
+  _injectPdf(w,'rc','דוח_יתרות');
 }
 
 function printPeriodReport(){
@@ -2323,11 +2317,10 @@ function printPeriodReport(){
     .btn-r{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:#1E40AF;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-left:8px}
     .btn-g{background:#15803d}
   </style>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   </head><body>
   <div class="no-print" style="margin-bottom:12px;display:flex;gap:8px">
     <button class="btn-r" onclick="window.print()">🖨️ הדפס</button>
-    <button class="btn-r btn-g" onclick="html2pdf().set({margin:[10,10,10,10],filename:'דוח_מאזן_${from}_${to}.pdf',html2canvas:{scale:2},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(document.getElementById('rc')).save()">📥 שמור PDF</button>
+    <button class="btn-r btn-g" id="btn-pdf">📥 שמור PDF</button>
   </div>
   <div id="rc">
   <h1>דוח מאזן — בית ספר לנהיגה ברוך תור</h1>
@@ -2348,6 +2341,19 @@ function printPeriodReport(){
   const w=window.open('','_blank');
   w.document.write(html);
   w.document.close();
+  _injectPdf(w,'rc','דוח_מאזן_'+from+'_'+to);
+}
+
+function _injectPdf(w, contentId, filename){
+  const s=w.document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+  s.onload=function(){
+    const btn=w.document.getElementById('btn-pdf');
+    if(btn) btn.onclick=function(){
+      w.html2pdf().set({margin:[10,10,10,10],filename:filename+'.pdf',html2canvas:{scale:2,useCORS:true},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(w.document.getElementById(contentId)).save();
+    };
+  };
+  w.document.head.appendChild(s);
 }
 
 async function appInit(){
