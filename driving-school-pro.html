@@ -11,6 +11,7 @@
 <meta name="theme-color" content="#1E40AF">
 <title>דרייב פרו</title>
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:16px;-webkit-text-size-adjust:100%}
@@ -503,7 +504,7 @@ const REG_FEE_NEW=150;
 const REG_FEE_TRANSFER=50;
 const HE_MONTHS=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
 const HE_DAYS=['א','ב','ג','ד','ה','ו','ש'];
-const LESSON_TYPES={lesson:'שיעור',internal:'מבחן פנימי',test:'טסט חיצוני',parking:'חניות',event:'אחר'};
+const LESSON_TYPES={lesson:'שיעור',internal:'מבחן פנימי',test:'טסט חיצוני',parking:'חניות',event:'אחר',note:'הערה אישית'};
 const LESSON_STATUS={done:'בוצע',cancelled:'בוטל',noshow:'לא הגיע',scheduled:'מתוכנן',failed:'נכשל'};
 const AVA_COLORS=['#1E40AF','#0891B2','#059669','#7C3AED','#DB2777','#D97706','#DC2626','#0369A1'];
 
@@ -795,7 +796,7 @@ function renderDashboard(){
   const income=monthIncome();
   const near=nearTestStudents();
   const tests2w=upcomingTests();
-  const debtors=highDebtors().slice(0,3);
+  const debtors=highDebtors().slice(0,6);
   const now=new Date();
 
   let alertHTML='';
@@ -1202,7 +1203,8 @@ function lessonCard(l){
     test:    {bg:'#7C1D1D',border:'#F87171'},
     internal:{bg:'#064E3B',border:'#10B981'},
     parking: {bg:'#1E3A5F',border:'#3B82F6'},
-    event:   {bg:'#365314',border:'#84CC16'}
+    event:   {bg:'#365314',border:'#84CC16'},
+    note:    {bg:'#374151',border:'#9CA3AF'}
   };
   const c=typeColors[l.type]||typeColors.lesson;
   const rawDur=+l.duration||1;
@@ -1213,8 +1215,8 @@ function lessonCard(l){
   return `<div class="lc" onclick="openLesson('${l.id}')" style="background:${c.bg};border:1.5px solid ${c.border};color:#fff;min-height:${minH}px">
     <div class="lt"><div class="lt-t" style="color:rgba(255,255,255,.9)">${l.time||'--:--'}</div><div class="lt-d" style="color:rgba(255,255,255,.7)">${dur}</div></div>
     <div class="li" style="flex:1">
-      <div class="li-n" style="color:#fff;font-weight:700">${l.type==='event'?(l.notes||'אחר'):st?st.name:'?'}</div>
-      ${l.type==='event'?'':noteTxt}
+      <div class="li-n" style="color:#fff;font-weight:700">${(l.type==='event'||l.type==='note')?(l.notes||LESSON_TYPES[l.type]):st?st.name:'?'}</div>
+      ${(l.type==='event'||l.type==='note')?'':noteTxt}
       ${l.type!=='event'?`<div class="li-m"><span style="background:rgba(255,255,255,.15);color:#fff;font-size:10px;padding:2px 7px;border-radius:4px">${LESSON_TYPES[l.type]||l.type}</span></div>`:''}
     </div>
     <div class="ls">${stIco[l.status]||'🕐'}</div>
@@ -1557,8 +1559,8 @@ function toggleLessonType(){
   const nl=document.getElementById('notes-label');
   if(dur) dur.style.display=type==='test'?'none':'';
   if(tp)  tp.style.display=type==='test'?'':'none';
-  if(sf)  sf.style.display=type==='event'?'none':'';
-  if(nl)  nl.textContent=type==='event'?'כותרת האירוע (תוצג ביומן) *':'הערות מקצועיות (פרטיות)';
+  if(sf)  sf.style.display=(type==='event'||type==='note')?'none':'';
+  if(nl)  nl.textContent=type==='event'?'כותרת האירוע (תוצג ביומן) *':type==='note'?'תוכן ההערה (פרטי)':'הערות מקצועיות (פרטיות)';
 }
 
 function saveStudent(id){
@@ -1676,6 +1678,7 @@ function showAddLesson(studentId=null, defaultType='lesson'){
           <option value="test" ${defaultType==='test'?'selected':''}>טסט חיצוני</option>
           <option value="parking" ${defaultType==='parking'?'selected':''}>חניות</option>
           <option value="event" ${defaultType==='event'?'selected':''}>🟢 אחר (ללא חיוב)</option>
+          <option value="note" ${defaultType==='note'?'selected':''}>📝 הערה אישית</option>
         </select>
       </div>
       <div class="fg" id="dur-field" style="${defaultType==='test'?'display:none':''}">
@@ -1770,7 +1773,7 @@ function saveLesson(id){
   const duration=parseFloat(document.getElementById('f-lduration')?.value||1);
   const status=document.getElementById('f-lstatus')?.value;
   const notes=document.getElementById('f-lnotes')?.value;
-  if(!sid && type!=='event'){toast('יש לבחור תלמיד','err');return;}
+  if(!sid && type!=='event' && type!=='note'){toast('יש לבחור תלמיד','err');return;}
   if(!date){toast('יש להזין תאריך','err');return;}
   const lesson={id:id||uid(),studentId:sid||null,date,time,type,duration,status,notes};
   dbLesson(lesson);
@@ -2353,8 +2356,32 @@ function printPeriodReport(){
 }
 
 function _injectPdf(w, contentId, filename){
-  const btn=w.document.getElementById('btn-pdf');
-  if(btn) btn.onclick=function(){ w.print(); };
+  // כפתור הדפסה — משאיר על חלון החדש
+  const printBtn=w.document.getElementById('btn-pdf');
+  if(printBtn) printBtn.setAttribute('data-pdf-filename', filename);
+
+  // PDF — מריץ html2pdf מתוך האפ הראשי על תוכן זמני
+  if(printBtn) printBtn.onclick=function(){
+    const srcEl=w.document.getElementById(contentId);
+    if(!srcEl) return;
+    const clone=document.createElement('div');
+    clone.dir='rtl';
+    clone.style.cssText='position:fixed;left:-9999px;top:0;width:794px;font-family:Arial,sans-serif;font-size:12px;color:#111;background:#fff;padding:20px';
+    // העתק סגנונות ותוכן
+    const styleEl=w.document.createElement('style');
+    Array.from(w.document.styleSheets).forEach(ss=>{
+      try{ Array.from(ss.cssRules).forEach(r=>{ styleEl.textContent+=r.cssText+'\n'; }); }catch(e){}
+    });
+    clone.appendChild(styleEl);
+    clone.innerHTML+=srcEl.outerHTML;
+    document.body.appendChild(clone);
+    html2pdf().set({
+      margin:[8,8,8,8],
+      filename: filename+'.pdf',
+      html2canvas:{scale:2,useCORS:true,logging:false},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+    }).from(clone).save().finally(()=>{ document.body.removeChild(clone); });
+  };
 }
 
 async function appInit(){
