@@ -673,15 +673,19 @@ function calcBalance(sid){
   // דמי רישום — נכנסים לחוב רק אם טרם שולמו בנפרד
   const regOwed = (!student.regPaid) ? (Number(student.regFee)||0) : 0;
   let owed = regOwed;
-  if(student.internal) owed += INTERNAL_PRICE; // ₪50 חד-פעמי — מבחן פנימי
+  // פנימי ₪50 — מהדגל בלבד אם אין ארוע פנימי; אם יש ארוע — נספר מהארועים
+  const hasInternalEvent = ls.some(l=>l.type==='internal'&&!l.freeInternal);
+  if(student.internal && !hasInternalEvent) owed += INTERNAL_PRICE;
   let lessonsOwed = 0;
   let units = 0;
 
   if(student.pkg==='per_lesson'){
-    // סופר יחידות (לא מספר שיעורים!) — שיעור 2 יח' = 2 יחידות
-    units = ls.filter(l=>l.type==='lesson'||l.type==='internal').reduce((a,l)=>a+(Number(l.duration)||1), 0);
+    // יחידות — שיעורים בלבד (פנימי לא מחויב בזמן, רק ₪50 קבוע)
+    units = ls.filter(l=>l.type==='lesson').reduce((a,l)=>a+(Number(l.duration)||1), 0);
     const intLs   = ls.filter(l=>l.type==='internal'&&!l.freeInternal).length;
-    const tstLs   = ls.filter(l=>l.type==='test').length;
+    // טסט — מחויב גם אם נכשל
+    const failedTests = S.lessons.filter(l=>l.studentId===sid&&l.status==='failed'&&l.type==='test').length;
+    const tstLs   = ls.filter(l=>l.type==='test').length + failedTests;
     const parkLs  = ls.filter(l=>l.type==='parking').length;
     lessonsOwed = units*(Number(student.price)||0) + intLs*INTERNAL_PRICE + tstLs*TEST_PRICE + parkLs*50;
     owed += lessonsOwed;
@@ -1052,9 +1056,9 @@ function toggleCheck(sid,field){
 }
 
 function lessonPrice(l,s){
-  if(l.status!=='done')return 0;
-  if(l.type==='test') return TEST_PRICE;
-  if(l.type==='internal'){ const tc=(s.price||0)*(l.duration||1); return l.freeInternal ? tc : tc+INTERNAL_PRICE; }
+  if(l.type==='test') return (l.status==='done'||l.status==='failed') ? TEST_PRICE : 0;
+  if(l.status!=='done') return 0;
+  if(l.type==='internal') return l.freeInternal ? 0 : INTERNAL_PRICE; // ₪50 קבוע, ללא חיוב זמן
   if(l.type==='parking') return 50;
   return (s.price||0)*(l.duration||1);
 }
