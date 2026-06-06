@@ -672,7 +672,7 @@ function calcBalance(sid){
   if(student.pkg==='per_lesson'){
     // סופר יחידות (לא מספר שיעורים!) — שיעור 2 יח' = 2 יחידות
     units = ls.filter(l=>l.type==='lesson'||l.type==='internal').reduce((a,l)=>a+(Number(l.duration)||1), 0);
-    const intLs   = ls.filter(l=>l.type==='internal').length;
+    const intLs   = ls.filter(l=>l.type==='internal'&&!l.freeInternal).length;
     const tstLs   = ls.filter(l=>l.type==='test').length;
     const parkLs  = ls.filter(l=>l.type==='parking').length;
     lessonsOwed = units*(Number(student.price)||0) + intLs*INTERNAL_PRICE + tstLs*TEST_PRICE + parkLs*50;
@@ -709,6 +709,13 @@ function totalDebt(){ return S.students.filter(s=>s.status==='active').reduce((a
 function monthIncome(){ const now=new Date(); return S.payments.filter(p=>{ const d=new Date(p.date); return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear(); }).reduce((a,p)=>a+p.amount,0); }
 function todayLessons(){ const today=todayStr(); return S.lessons.filter(l=>l.date===today&&(l.status==='scheduled'||l.status==='done')).sort((a,b)=>a.time.localeCompare(b.time)); }
 function nearTestStudents(){ return S.students.filter(s=>{ if(s.status!=='active')return false; const done=S.lessons.filter(l=>l.studentId===s.id&&l.status==='done'&&l.type==='lesson').length; return done>=20&&done<30; }).length; }
+function upcomingTests(){
+  const now=new Date(); const tod=todayStr();
+  const in2w=new Date(now.getFullYear(),now.getMonth(),now.getDate()+14).toISOString().split('T')[0];
+  return S.lessons.filter(l=>l.type==='test'&&l.status==='scheduled'&&l.date>=tod&&l.date<=in2w)
+    .sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time))
+    .map(l=>({...l,studentName:S.students.find(s=>s.id===l.studentId)?.name||'?'}));
+}
 function highDebtors(){ return S.students.filter(s=>s.status==='active').map(s=>({...s,debt:calcBalance(s.id).debt})).filter(s=>s.debt>999).sort((a,b)=>b.debt-a.debt); }
 
 // ═══════════════════════════════════════════════
@@ -779,6 +786,7 @@ function renderDashboard(){
   const debt=totalDebt();
   const income=monthIncome();
   const near=nearTestStudents();
+  const tests2w=upcomingTests();
   const debtors=highDebtors().slice(0,3);
   const now=new Date();
 
@@ -828,6 +836,18 @@ function renderDashboard(){
     <div class="kpi kg"><div class="kpi-ico">👥</div><div class="kpi-val">${active}</div><div class="kpi-lbl">תלמידים פעילים</div></div>
     <div class="kpi kw"><div class="kpi-ico">🎯</div><div class="kpi-val">${near}</div><div class="kpi-lbl">קרובים לטסט</div></div>
   </div>
+  ${tests2w.length>0?`
+  <div class="sh"><span class="st">🎯 טסטים בשבועיים הקרובים</span></div>
+  <div class="card" style="margin:0 16px 8px">
+    ${tests2w.map(t=>`<div class="pi" onclick="openLesson('${t.id}')">
+      <div class="pi-ico" style="background:var(--wal);font-size:18px">🎯</div>
+      <div class="pi-info">
+        <div class="pi-n fw7">${t.studentName}</div>
+        <div class="pi-d">${fmtDate(t.date)}${t.time?' · '+t.time:''}</div>
+      </div>
+      <span class="badge by">${Math.ceil((new Date(t.date)-new Date())/86400000)} ימים</span>
+    </div>`).join('')}
+  </div>`:''}
   <div class="sh"><span class="st">שיעורים היום</span><button class="sa btn" onclick="navigate('calendar')">כל היומן</button></div>
   ${todayHTML}
   <div style="height:8px"></div>`;
@@ -1025,7 +1045,7 @@ function toggleCheck(sid,field){
 function lessonPrice(l,s){
   if(l.status!=='done')return 0;
   if(l.type==='test') return TEST_PRICE;
-  if(l.type==='internal') return INTERNAL_PRICE;
+  if(l.type==='internal'){ const tc=(s.price||0)*(l.duration||1); return l.freeInternal ? tc : tc+INTERNAL_PRICE; }
   if(l.type==='parking') return 50;
   return (s.price||0)*(l.duration||1);
 }
@@ -1171,7 +1191,7 @@ function lessonCard(l){
   const stIco={done:'✅',cancelled:'❌',noshow:'⚠️',scheduled:'🕐',failed:'💔'};
   const typeColors={
     lesson:  {bg:'#3B1FA3',border:'#6D4FD6'},
-    test:    {bg:'#92400E',border:'#F59E0B'},
+    test:    {bg:'#713F12',border:'#EAB308'},
     internal:{bg:'#064E3B',border:'#10B981'},
     parking: {bg:'#1E3A5F',border:'#3B82F6'},
     event:   {bg:'#365314',border:'#84CC16'}
@@ -1333,7 +1353,7 @@ function importOccasionalToStudent(){
   lessons.forEach(l=>{
     const dup=S.lessons.some(x=>x.studentId===student.id&&x.date===l.date&&x.time===l.time);
     if(!dup){
-      dbLesson({id:uid(),studentId:student.id,date:l.date,time:l.time,type:l.type,duration:l.duration,status:'done',notes:l.notes||''});
+      dbLesson({id:uid(),studentId:student.id,date:l.date,time:l.time,type:l.type,duration:l.duration,status:'done',notes:l.notes||'',freeInternal:l.freeInternal||false});
       addedL++;
     }
   });
@@ -1517,8 +1537,10 @@ function toggleLessonType(){
   const type=document.getElementById('f-ltype')?.value;
   const dur=document.getElementById('dur-field');
   const tp=document.getElementById('test-price-field');
+  const sl=document.getElementById('student-label');
   if(dur) dur.style.display=type==='test'?'none':'';
   if(tp)  tp.style.display=type==='test'?'':'none';
+  if(sl)  sl.textContent=type==='event'?'תלמיד (אופציונלי)':'תלמיד *';
 }
 
 function saveStudent(id){
@@ -1613,7 +1635,7 @@ function showAddLesson(studentId=null, defaultType='lesson'){
   <div class="m-handle"></div>
   <div class="m-hdr"><span class="m-title">הוספת שיעור</span><button class="m-close" onclick="closeModal()">×</button></div>
   <div class="m-body">
-    <div class="fg"><label class="fl">תלמיד *</label>
+    <div class="fg"><label class="fl" id="student-label">תלמיד *</label>
       <select class="fi fsel" id="f-lstudent">
         <option value="">-- בחר תלמיד --</option>
         ${students.map(s=>`<option value="${s.id}" ${s.id===studentId?'selected':''}>${s.name}</option>`).join('')}
@@ -1728,9 +1750,9 @@ function saveLesson(id){
   const duration=parseFloat(document.getElementById('f-lduration')?.value||1);
   const status=document.getElementById('f-lstatus')?.value;
   const notes=document.getElementById('f-lnotes')?.value;
-  if(!sid){toast('יש לבחור תלמיד','err');return;}
+  if(!sid && type!=='event'){toast('יש לבחור תלמיד','err');return;}
   if(!date){toast('יש להזין תאריך','err');return;}
-  const lesson={id:id||uid(),studentId:sid,date,time,type,duration,status,notes};
+  const lesson={id:id||uid(),studentId:sid||null,date,time,type,duration,status,notes};
   dbLesson(lesson);
   closeModal();
   toast('שיעור נשמר ✅','ok');
@@ -1977,11 +1999,60 @@ function autoFixPastScheduled(){
   }
 }
 
+// ════════════════════════════════════════════════
+// NOTIFICATIONS — התראה + סאונד לפני שיעור
+// ════════════════════════════════════════════════
+function playBeep(){
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    [0,200].forEach(d=>{
+      const o=ctx.createOscillator(),g=ctx.createGain();
+      o.connect(g);g.connect(ctx.destination);
+      o.frequency.value=880;o.type='sine';
+      g.gain.setValueAtTime(0.4,ctx.currentTime+d/1000);
+      g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+d/1000+0.35);
+      o.start(ctx.currentTime+d/1000);o.stop(ctx.currentTime+d/1000+0.35);
+    });
+  }catch(e){}
+}
+
+function checkUpcomingLessons(){
+  const now=new Date();
+  const tod=todayStr();
+  S.lessons.forEach(l=>{
+    if(l.date!==tod||l.status!=='scheduled'||!l.time) return;
+    const [h,m]=l.time.split(':').map(Number);
+    const lt=new Date(now.getFullYear(),now.getMonth(),now.getDate(),h,m);
+    const diff=(lt-now)/60000;
+    if(diff>0&&diff<=10){
+      const key='alrt_'+l.id+'_'+tod;
+      if(sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key,'1');
+      const st=S.students.find(s=>s.id===l.studentId);
+      const msg=`🚗 שיעור עם ${st?st.name:'תלמיד'} בעוד ${Math.round(diff)} דק'`;
+      if('Notification' in window&&Notification.permission==='granted'){
+        new Notification('דרייב פרו',{body:msg});
+      }
+      toast(msg,'ok');
+      playBeep();
+    }
+  });
+}
+
+function initNotifications(){
+  if('Notification' in window&&Notification.permission==='default'){
+    Notification.requestPermission();
+  }
+  checkUpcomingLessons();
+  setInterval(checkUpcomingLessons,60000);
+}
+
 async function appInit(){
   if(localStorage.getItem('dp_dark')==='1') document.body.classList.add('dark');
   dbLoad();
   autoFixPastScheduled();
   renderContent();
+  initNotifications();
   if(hasAPI()){
     showSyncStatus('⟳ מסנכרן עם Sheets...');
     const ok = await apiLoadAll();
@@ -2376,6 +2447,10 @@ function saveEditPayment(id){
   if(!amt||amt<=0){toast('יש להזין סכום','err');return;}
   if(!date){toast('יש להזין תאריך','err');return;}
   const receiptNum=document.getElementById('f-preceipt')?.value||null;
+  if(receiptNum){
+    const dup=S.payments.find(x=>x.id!==id&&x.receiptNum&&String(x.receiptNum)===String(receiptNum));
+    if(dup){const dupSt=S.students.find(s=>s.id===dup.studentId);toast(`קבלה #${receiptNum} כבר קיימת — ${dupSt?dupSt.name:''} ${fmtDate(dup.date)}`,'err');return;}
+  }
   p.amount=amt; p.date=date; p.method=method; p.notes=notes||null; p.receiptNum=receiptNum||null;
   dbPayment(p);
   closeModal();
