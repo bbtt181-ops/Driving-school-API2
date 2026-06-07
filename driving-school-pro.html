@@ -11,6 +11,7 @@
 <meta name="theme-color" content="#1E40AF">
 <title>דרייב פרו</title>
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:16px;-webkit-text-size-adjust:100%}
@@ -344,6 +345,9 @@ body.dark .hdr-back{color:var(--t1)}
     <button class="nav-item" data-view="occasional" onclick="navigate('occasional')">
       <span class="nav-icon">🧍</span><span>מזדמן</span>
     </button>
+    <button class="nav-item" data-view="reports" onclick="navigate('reports')">
+      <span class="nav-icon">📋</span><span>דוחות</span>
+    </button>
   </nav>
 </div>
 <div id="mo" onclick="overlayClick(event)">
@@ -500,7 +504,7 @@ const REG_FEE_NEW=150;
 const REG_FEE_TRANSFER=50;
 const HE_MONTHS=['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר'];
 const HE_DAYS=['א','ב','ג','ד','ה','ו','ש'];
-const LESSON_TYPES={lesson:'שיעור',internal:'מבחן פנימי',test:'טסט חיצוני',parking:'חניות',event:'אירוע'};
+const LESSON_TYPES={lesson:'שיעור',internal:'מבחן פנימי',test:'טסט חיצוני',parking:'חניות',event:'אחר',note:'הערה אישית'};
 const LESSON_STATUS={done:'בוצע',cancelled:'בוטל',noshow:'לא הגיע',scheduled:'מתוכנן',failed:'נכשל'};
 const AVA_COLORS=['#1E40AF','#0891B2','#059669','#7C3AED','#DB2777','#D97706','#DC2626','#0369A1'];
 
@@ -669,15 +673,19 @@ function calcBalance(sid){
   // דמי רישום — נכנסים לחוב רק אם טרם שולמו בנפרד
   const regOwed = (!student.regPaid) ? (Number(student.regFee)||0) : 0;
   let owed = regOwed;
-  if(student.internal) owed += INTERNAL_PRICE; // ₪50 חד-פעמי — מבחן פנימי
+  // פנימי ₪50 — מהדגל בלבד אם אין ארוע פנימי; אם יש ארוע — נספר מהארועים
+  const hasInternalEvent = ls.some(l=>l.type==='internal'&&!l.freeInternal);
+  if(student.internal && !hasInternalEvent) owed += INTERNAL_PRICE;
   let lessonsOwed = 0;
   let units = 0;
 
   if(student.pkg==='per_lesson'){
-    // סופר יחידות (לא מספר שיעורים!) — שיעור 2 יח' = 2 יחידות
-    units = ls.filter(l=>l.type==='lesson'||l.type==='internal').reduce((a,l)=>a+(Number(l.duration)||1), 0);
+    // יחידות — שיעורים בלבד (פנימי לא מחויב בזמן, רק ₪50 קבוע)
+    units = ls.filter(l=>l.type==='lesson').reduce((a,l)=>a+(Number(l.duration)||1), 0);
     const intLs   = ls.filter(l=>l.type==='internal'&&!l.freeInternal).length;
-    const tstLs   = ls.filter(l=>l.type==='test').length;
+    // טסט — מחויב גם אם נכשל
+    const failedTests = S.lessons.filter(l=>l.studentId===sid&&l.status==='failed'&&l.type==='test').length;
+    const tstLs   = ls.filter(l=>l.type==='test').length + failedTests;
     const parkLs  = ls.filter(l=>l.type==='parking').length;
     lessonsOwed = units*(Number(student.price)||0) + intLs*INTERNAL_PRICE + tstLs*TEST_PRICE + parkLs*50;
     owed += lessonsOwed;
@@ -748,7 +756,7 @@ function renderHeader(){
   } else if(S.view==='add-lesson-view'){
     h.innerHTML=`<button class="btn-ic" onclick="navigate('calendar')" style="margin-left:10px">←</button><div class="h-title">הוספת שיעור</div>`;
   } else {
-    const titles={dashboard:'',students:'תלמידים',calendar:'יומן',payments:'תשלומים',archive:'ארכיון',occasional:'תלמיד מזדמן'};
+    const titles={dashboard:'',students:'תלמידים',calendar:'יומן',payments:'תשלומים',archive:'ארכיון',occasional:'תלמיד מזדמן',reports:'דוחות'};
     const darkBtn=`<button class="btn-ic" onclick="toggleDark()" title="מצב לילה" style="margin-left:6px">${document.body.classList.contains('dark')?'☀️':'🌙'}</button>`;
     const settingsBtn=`<button class="btn-ic" onclick="showApiSettings()" title="הגדרות שיטס" style="font-size:14px">${hasAPI()?'🔗':'⚙️'}</button>`;
     if(S.view==='dashboard'){
@@ -771,6 +779,7 @@ function renderContent(){
     case 'payments': c.innerHTML=renderPayments(); break;
     case 'archive': c.innerHTML=renderArchive(); break;
     case 'occasional': c.innerHTML=renderOccasional(); break;
+    case 'reports': c.innerHTML=renderReports(); break;
     default: c.innerHTML=renderDashboard();
   }
   renderHeader();
@@ -791,7 +800,7 @@ function renderDashboard(){
   const income=monthIncome();
   const near=nearTestStudents();
   const tests2w=upcomingTests();
-  const debtors=highDebtors().slice(0,3);
+  const debtors=highDebtors().slice(0,6);
   const now=new Date();
 
   let alertHTML='';
@@ -829,7 +838,7 @@ function renderDashboard(){
     <div class="db-greet">שלום ברוך 👋</div>
     <div class="db-title">לוח בקרה</div>
     <div class="db-box">
-      <div><div class="db-bl">שיעורים היום</div><div class="db-bv">${tl.length}</div></div>
+      <div><div class="db-bl">יחידות היום</div><div class="db-bv">${tl.reduce((a,l)=>a+(parseFloat(l.duration)||1),0)}</div></div>
       <div style="text-align:left"><div class="db-bl">תלמידים פעילים</div><div class="db-bv">${active}</div></div>
     </div>
   </div>
@@ -1047,9 +1056,9 @@ function toggleCheck(sid,field){
 }
 
 function lessonPrice(l,s){
-  if(l.status!=='done')return 0;
-  if(l.type==='test') return TEST_PRICE;
-  if(l.type==='internal'){ const tc=(s.price||0)*(l.duration||1); return l.freeInternal ? tc : tc+INTERNAL_PRICE; }
+  if(l.type==='test') return (l.status==='done'||l.status==='failed') ? TEST_PRICE : 0;
+  if(l.status!=='done') return 0;
+  if(l.type==='internal') return l.freeInternal ? 0 : INTERNAL_PRICE; // ₪50 קבוע, ללא חיוב זמן
   if(l.type==='parking') return 50;
   return (s.price||0)*(l.duration||1);
 }
@@ -1195,10 +1204,11 @@ function lessonCard(l){
   const stIco={done:'✅',cancelled:'❌',noshow:'⚠️',scheduled:'🕐',failed:'💔'};
   const typeColors={
     lesson:  {bg:'#3B1FA3',border:'#6D4FD6'},
-    test:    {bg:'#713F12',border:'#EAB308'},
+    test:    {bg:'#7C1D1D',border:'#F87171'},
     internal:{bg:'#064E3B',border:'#10B981'},
     parking: {bg:'#1E3A5F',border:'#3B82F6'},
-    event:   {bg:'#365314',border:'#84CC16'}
+    event:   {bg:'#365314',border:'#84CC16'},
+    note:    {bg:'#374151',border:'#9CA3AF'}
   };
   const c=typeColors[l.type]||typeColors.lesson;
   const rawDur=+l.duration||1;
@@ -1209,9 +1219,9 @@ function lessonCard(l){
   return `<div class="lc" onclick="openLesson('${l.id}')" style="background:${c.bg};border:1.5px solid ${c.border};color:#fff;min-height:${minH}px">
     <div class="lt"><div class="lt-t" style="color:rgba(255,255,255,.9)">${l.time||'--:--'}</div><div class="lt-d" style="color:rgba(255,255,255,.7)">${dur}</div></div>
     <div class="li" style="flex:1">
-      <div class="li-n" style="color:#fff;font-weight:700">${st?st.name:'?'}</div>
-      ${noteTxt}
-      <div class="li-m"><span style="background:rgba(255,255,255,.15);color:#fff;font-size:10px;padding:2px 7px;border-radius:4px">${LESSON_TYPES[l.type]||l.type}</span></div>
+      <div class="li-n" style="color:#fff;font-weight:700">${(l.type==='event'||l.type==='note')?(l.notes||LESSON_TYPES[l.type]):st?st.name:'?'}</div>
+      ${(l.type==='event'||l.type==='note')?'':noteTxt}
+      ${l.type!=='event'?`<div class="li-m"><span style="background:rgba(255,255,255,.15);color:#fff;font-size:10px;padding:2px 7px;border-radius:4px">${LESSON_TYPES[l.type]||l.type}</span></div>`:''}
     </div>
     <div class="ls">${stIco[l.status]||'🕐'}</div>
   </div>`;
@@ -1544,9 +1554,12 @@ function toggleLessonType(){
   const dur=document.getElementById('dur-field');
   const tp=document.getElementById('test-price-field');
   const sl=document.getElementById('student-label');
+  const sf=document.getElementById('student-field');
+  const nl=document.getElementById('notes-label');
   if(dur) dur.style.display=type==='test'?'none':'';
   if(tp)  tp.style.display=type==='test'?'':'none';
-  if(sl)  sl.textContent=type==='event'?'תלמיד (אופציונלי)':'תלמיד *';
+  if(sf)  sf.style.display=(type==='event'||type==='note')?'none':'';
+  if(nl)  nl.textContent=type==='event'?'כותרת האירוע (תוצג ביומן) *':type==='note'?'תוכן ההערה (פרטי)':'הערות מקצועיות (פרטיות)';
 }
 
 function saveStudent(id){
@@ -1641,7 +1654,8 @@ function showAddLesson(studentId=null, defaultType='lesson'){
   <div class="m-handle"></div>
   <div class="m-hdr"><span class="m-title">הוספת שיעור</span><button class="m-close" onclick="closeModal()">×</button></div>
   <div class="m-body">
-    <div class="fg"><label class="fl" id="student-label">תלמיד *</label>
+    <div class="fg" id="student-field">
+      <label class="fl" id="student-label">תלמיד *</label>
       <select class="fi fsel" id="f-lstudent">
         <option value="">-- בחר תלמיד --</option>
         ${students.map(s=>`<option value="${s.id}" ${s.id===studentId?'selected':''}>${s.name}</option>`).join('')}
@@ -1661,7 +1675,8 @@ function showAddLesson(studentId=null, defaultType='lesson'){
           <option value="internal" ${defaultType==='internal'?'selected':''}>מבחן פנימי</option>
           <option value="test" ${defaultType==='test'?'selected':''}>טסט חיצוני</option>
           <option value="parking" ${defaultType==='parking'?'selected':''}>חניות</option>
-          <option value="event" ${defaultType==='event'?'selected':''}>🟢 אירוע (לא שיעור)</option>
+          <option value="event" ${defaultType==='event'?'selected':''}>🟢 אחר (ללא חיוב)</option>
+          <option value="note" ${defaultType==='note'?'selected':''}>📝 הערה אישית</option>
         </select>
       </div>
       <div class="fg" id="dur-field" style="${defaultType==='test'?'display:none':''}">
@@ -1681,7 +1696,7 @@ function showAddLesson(studentId=null, defaultType='lesson'){
         <option value="noshow">לא הגיע</option>
       </select>
     </div>
-    <div class="fg"><label class="fl">הערות מקצועיות (פרטיות)</label><textarea class="fi" id="f-lnotes" rows="3" placeholder="הערות לשיעור זה..."></textarea></div>
+    <div class="fg"><label class="fl" id="notes-label">הערות מקצועיות (פרטיות)</label><textarea class="fi" id="f-lnotes" rows="3" placeholder="הערות לשיעור זה..."></textarea></div>
   </div>
   <div class="m-foot"><button class="btn btn-o" onclick="closeModal()">ביטול</button><button class="btn btn-p" style="flex:1" onclick="saveLesson('')">שמור שיעור</button></div>
   <div style="height:8px"></div>`);
@@ -1756,7 +1771,7 @@ function saveLesson(id){
   const duration=parseFloat(document.getElementById('f-lduration')?.value||1);
   const status=document.getElementById('f-lstatus')?.value;
   const notes=document.getElementById('f-lnotes')?.value;
-  if(!sid && type!=='event'){toast('יש לבחור תלמיד','err');return;}
+  if(!sid && type!=='event' && type!=='note'){toast('יש לבחור תלמיד','err');return;}
   if(!date){toast('יש להזין תאריך','err');return;}
   const lesson={id:id||uid(),studentId:sid||null,date,time,type,duration,status,notes};
   dbLesson(lesson);
@@ -2051,6 +2066,320 @@ function initNotifications(){
   }
   checkUpcomingLessons();
   setInterval(checkUpcomingLessons,60000);
+}
+
+// ═══════════════════════════════════════════════
+// REPORTS
+// ═══════════════════════════════════════════════
+function renderReports(){
+  const now=new Date();
+  const firstOfMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`;
+  const today=todayStr();
+  if(!S.reportFrom) S.reportFrom=firstOfMonth;
+  if(!S.reportTo)   S.reportTo=today;
+  return `<div style="padding:12px 16px">
+    <div class="sh"><span class="st">📋 דוחות</span></div>
+    <div class="card cp" style="margin:0 0 12px">
+      <div class="fw7" style="margin-bottom:10px;font-size:14px">יתרת חוב לכל תלמיד</div>
+      <p style="font-size:12px;color:var(--t2);margin:0 0 10px">סיכום שיעורים, תשלומים וחוב לכל תלמיד פעיל — מתאים להדפסה</p>
+      <button class="btn btn-p btn-full" onclick="printBalanceReport()">🖨️ הדפסת דוח יתרות</button>
+    </div>
+    <div class="card cp" style="margin:0 0 12px">
+      <div class="fw7" style="margin-bottom:10px;font-size:14px">דוח שיעורים ותשלומים לתלמיד</div>
+      <p style="font-size:12px;color:var(--t2);margin:0 0 10px">הזן שם תלמיד או מספר זהות — יופק דוח A4 עם פרטי תלמיד, שיעורים ותשלומים</p>
+      <input class="fi" id="rep-student-q" type="text" placeholder="שם / מספר זהות..." oninput="repStudentSearch(this.value)" style="margin-bottom:8px">
+      <div id="rep-student-results" style="font-size:13px;color:var(--t2)"></div>
+    </div>
+    <div class="card cp" style="margin:0 0 12px">
+      <div class="fw7" style="margin-bottom:10px;font-size:14px">דוח מאזן לתקופה</div>
+      <div style="display:flex;gap:10px;margin-bottom:10px">
+        <div class="fg" style="flex:1"><label class="fl">מתאריך</label>
+          <input class="fi" type="date" value="${S.reportFrom}" onchange="S.reportFrom=this.value">
+        </div>
+        <div class="fg" style="flex:1"><label class="fl">עד תאריך</label>
+          <input class="fi" type="date" value="${S.reportTo}" onchange="S.reportTo=this.value">
+        </div>
+      </div>
+      <button class="btn btn-p btn-full" onclick="printPeriodReport()">🖨️ הדפסת דוח מאזן</button>
+    </div>
+  </div>`;
+}
+
+function repStudentSearch(q){
+  const el=document.getElementById('rep-student-results');
+  if(!el) return;
+  if(!q||q.length<2){el.innerHTML='';return;}
+  const qc=q.replace(/[-\s]/g,'').toLowerCase();
+  const found=S.students.filter(s=>
+    (s.name||'').toLowerCase().includes(q.toLowerCase())||
+    String(s.idnum||s.idNum||'').replace(/[-\s]/g,'').includes(qc)||
+    String(s.phone||'').replace(/[-\s]/g,'').includes(qc)
+  );
+  if(found.length===0){el.innerHTML='<div style="color:var(--er)">לא נמצא תלמיד</div>';return;}
+  el.innerHTML=found.map(s=>`<div style="padding:6px 0;border-bottom:1px solid var(--bd);cursor:pointer;display:flex;justify-content:space-between;align-items:center" onclick="printStudentReport('${s.id}')">
+    <span><b>${s.name}</b> ${s.idnum?'· ת"ז '+s.idnum:''}</span>
+    <button class="btn btn-p btn-sm">🖨️ הפק</button>
+  </div>`).join('');
+}
+
+function printStudentReport(sid){
+  const s=S.students.find(x=>x.id===sid);
+  if(!s) return;
+  const bal=calcBalance(sid);
+  const lessons=S.lessons.filter(l=>l.studentId===sid).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time||''));
+  const payments=S.payments.filter(p=>p.studentId===sid).sort((a,b)=>a.date.localeCompare(b.date));
+  const doneUnits=lessons.filter(l=>l.status==='done'&&(l.type==='lesson'||l.type==='internal')).reduce((a,l)=>a+(Number(l.duration)||1),0);
+  const TYPES={lesson:'שיעור',internal:'מבחן פנימי',test:'טסט',parking:'חניות',event:'אחר'};
+  const STATUS={done:'בוצע',cancelled:'בוטל',noshow:'לא הגיע',scheduled:'מתוכנן',failed:'נכשל'};
+  const lessonRows=lessons.map((l,i)=>{
+    const price=l.status==='done'?lessonPrice(l,s):0;
+    return `<tr>
+      <td style="text-align:center">${i+1}</td>
+      <td>${l.date}</td>
+      <td>${l.time||'—'}</td>
+      <td>${TYPES[l.type]||l.type}</td>
+      <td style="text-align:center">${l.type==='test'?'—':l.duration||1}</td>
+      <td>${STATUS[l.status]||l.status}</td>
+      <td style="text-align:left">${price?'₪'+price.toLocaleString():'—'}</td>
+      <td style="font-size:11px;color:#555">${l.notes||''}</td>
+    </tr>`;
+  }).join('');
+  const payRows=payments.map(p=>`<tr>
+    <td>${p.date}</td>
+    <td style="text-align:left;font-weight:700;color:#15803d">₪${Number(p.amount||0).toLocaleString()}</td>
+    <td>${p.method||'—'}</td>
+    <td>${p.receiptNum||''}</td>
+    <td style="font-size:11px;color:#555">${p.notes||''}</td>
+  </tr>`).join('');
+  const debtColor=bal.debt>0?'#b91c1c':bal.debt<0?'#15803d':'#15803d';
+  const debtLabel=bal.debt>0?`חוב: ₪${bal.debt.toLocaleString()}`:bal.debt<0?`זכות: ₪${Math.abs(bal.debt).toLocaleString()}`:'מאוזן ✓';
+  const html=`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
+  <title>דוח תלמיד — ${s.name}</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:12px}
+    @media(min-width:600px){body{padding:16mm 14mm}}
+    @page{size:A4;margin:16mm 14mm}
+    @media print{.no-print{display:none!important}}
+    h1{font-size:20px;font-weight:700;color:#1E40AF;margin-bottom:2px}
+    .sub{font-size:11px;color:#666;margin-bottom:12px}
+    .student-card{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;background:#f1f5f9;border-radius:8px;padding:10px 14px;margin-bottom:14px;border:1px solid #e2e8f0}
+    .field{display:flex;flex-direction:column}
+    .field-l{font-size:10px;color:#64748b;font-weight:600}
+    .field-v{font-size:13px;font-weight:700;color:#0f172a}
+    .balance-bar{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+    .bal{flex:1;min-width:80px;border-radius:8px;padding:8px 10px;text-align:center;border:1px solid #e2e8f0}
+    .bal-v{font-size:16px;font-weight:700}
+    .bal-l{font-size:10px;color:#666}
+    h2{font-size:13px;font-weight:700;color:#1E40AF;border-bottom:2px solid #1E40AF;padding-bottom:3px;margin:12px 0 6px}
+    table{width:100%;border-collapse:collapse;font-size:11px}
+    th{background:#1E40AF;color:#fff;padding:6px 8px;text-align:right;font-size:11px}
+    td{padding:5px 8px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+    tr:nth-child(even) td{background:#f8fafc}
+    .btn-print{display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;padding:7px 16px;background:#1E40AF;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-left:8px}
+    .btn-pdf{background:#15803d}
+  </style>
+  </head><body>
+  <div class="no-print" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn-print" onclick="window.print()">🖨️ הדפס</button>
+    <button class="btn-print btn-pdf" id="btn-pdf">📥 שמור PDF</button>
+  </div>
+  <div id="student-report">
+  <h1>דוח תלמיד — ${s.name}</h1>
+  <p class="sub">הופק: ${new Date().toLocaleDateString('he-IL')} | בית ספר לנהיגה ברוך תור</p>
+  <div class="student-card">
+    <div class="field"><span class="field-l">שם מלא</span><span class="field-v">${s.name||'—'}</span></div>
+    <div class="field"><span class="field-l">מספר זהות</span><span class="field-v">${s.idnum||s.idNum||'—'}</span></div>
+    <div class="field"><span class="field-l">טלפון</span><span class="field-v">${s.phone||'—'}</span></div>
+    <div class="field"><span class="field-l">תאריך לידה</span><span class="field-v">${s.dob||'—'}</span></div>
+    <div class="field"><span class="field-l">מחיר ליחידה</span><span class="field-v">₪${s.price||0}</span></div>
+    <div class="field"><span class="field-l">סטטוס</span><span class="field-v">${s.status==='active'?'פעיל':'לא פעיל'}</span></div>
+  </div>
+  <div class="balance-bar">
+    <div class="bal"><div class="bal-v" style="color:#1E40AF">₪${bal.owed.toLocaleString()}</div><div class="bal-l">לתשלום</div></div>
+    <div class="bal"><div class="bal-v" style="color:#15803d">₪${bal.paid.toLocaleString()}</div><div class="bal-l">שולם</div></div>
+    <div class="bal"><div class="bal-v" style="color:${debtColor}">${debtLabel}</div><div class="bal-l">יתרה</div></div>
+    <div class="bal"><div class="bal-v">${doneUnits}</div><div class="bal-l">יחידות</div></div>
+  </div>
+  <h2>שיעורים (${lessons.length} רשומות | ${doneUnits} יחידות)</h2>
+  <table><thead><tr><th>#</th><th>תאריך</th><th>שעה</th><th>סוג</th><th>יח'</th><th>סטטוס</th><th>חיוב</th><th>הערות</th></tr></thead>
+  <tbody>${lessonRows}</tbody>
+  <tfoot><tr style="font-weight:700;background:#f1f5f9"><td colspan="6">סה"כ לתשלום</td><td>₪${bal.owed.toLocaleString()}</td><td></td></tr></tfoot></table>
+  <h2>תשלומים (${payments.length})</h2>
+  <table><thead><tr><th>תאריך</th><th>סכום</th><th>אמצעי</th><th>קבלה</th><th>הערות</th></tr></thead>
+  <tbody>${payRows}</tbody>
+  <tfoot><tr style="font-weight:700;background:#f1f5f9"><td>סה"כ שולם</td><td>₪${bal.paid.toLocaleString()}</td><td></td><td></td><td></td></tr></tfoot></table>
+  </div>
+  </body></html>`;
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  _injectPdf(w,'student-report','דוח_תלמיד_'+s.name.replace(/\s+/g,'_'));
+}
+
+function printBalanceReport(){
+  const active=S.students.filter(s=>s.status==='active').sort((a,b)=>a.name.localeCompare(b.name,'he'));
+  const rows=active.map(s=>{
+    const b=calcBalance(s.id);
+    const lessons=S.lessons.filter(l=>l.studentId===s.id&&l.status==='done'&&(l.type==='lesson'||l.type==='internal'));
+    const units=lessons.reduce((a,l)=>a+(Number(l.duration)||1),0);
+    const debtColor=b.debt>0?'#b91c1c':b.debt<0?'#15803d':'#111';
+    return `<tr>
+      <td>${s.name}</td>
+      <td style="text-align:center">${lessons.length}</td>
+      <td style="text-align:center">${units}</td>
+      <td style="text-align:left">₪${b.owed.toLocaleString()}</td>
+      <td style="text-align:left">₪${b.paid.toLocaleString()}</td>
+      <td style="text-align:left;color:${debtColor};font-weight:700">${b.debt>0?'₪'+b.debt.toLocaleString():b.debt<0?'זכות ₪'+Math.abs(b.debt).toLocaleString():'מאוזן'}</td>
+    </tr>`;
+  }).join('');
+  const totalOwed=active.reduce((a,s)=>a+calcBalance(s.id).owed,0);
+  const totalPaid=active.reduce((a,s)=>a+calcBalance(s.id).paid,0);
+  const totalDebt=active.reduce((a,s)=>{ const d=calcBalance(s.id).debt; return a+(d>0?d:0); },0);
+  const html=`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
+  <title>דוח יתרות — דרייב פרו</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body{font-family:Arial,sans-serif;font-size:12px;margin:12px;color:#111}
+    @media(min-width:600px){body{font-size:13px;margin:20px}}
+    table{table-layout:fixed;word-break:break-word}
+    @page{size:A4;margin:16mm 14mm}
+    @media print{.no-print{display:none!important}}
+    h1{font-size:18px;margin:0 0 4px}
+    .sub{color:#666;font-size:12px;margin:0 0 16px}
+    .btn-r{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:#1E40AF;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-left:8px}
+    .btn-g{background:#15803d}
+    table{width:100%;border-collapse:collapse}
+    th{background:#1E40AF;color:#fff;padding:8px 10px;text-align:right}
+    td{padding:7px 10px;border-bottom:1px solid #e2e8f0}
+    tr:nth-child(even) td{background:#f8fafc}
+    .tot{background:#f1f5f9;font-weight:700}
+  </style>
+  </head><body>
+  <div class="no-print" style="margin-bottom:12px;display:flex;gap:8px">
+    <button class="btn-r" onclick="window.print()">🖨️ הדפס</button>
+    <button class="btn-r btn-g" id="btn-pdf">📥 שמור PDF</button>
+  </div>
+  <div id="rc">
+  <h1>דוח יתרת חוב — בית ספר לנהיגה ברוך תור</h1>
+  <p class="sub">תאריך הפקה: ${new Date().toLocaleDateString('he-IL')} | ${active.length} תלמידים פעילים</p>
+  <table>
+    <thead><tr><th>שם תלמיד</th><th>שיעורים</th><th>יחידות</th><th>לתשלום</th><th>שולם</th><th>יתרה</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr class="tot"><td>סה"כ</td><td></td><td></td><td>₪${totalOwed.toLocaleString()}</td><td>₪${totalPaid.toLocaleString()}</td><td style="color:${totalDebt>0?'#b91c1c':'#15803d'}">₪${totalDebt.toLocaleString()}</td></tr></tfoot>
+  </table>
+  </div>
+  </body></html>`;
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  _injectPdf(w,'rc','דוח_יתרות');
+}
+
+function printPeriodReport(){
+  const from=S.reportFrom||todayStr();
+  const to=S.reportTo||todayStr();
+  const pays=S.payments.filter(p=>p.date>=from&&p.date<=to).sort((a,b)=>a.date.localeCompare(b.date));
+  const lessons=S.lessons.filter(l=>l.date>=from&&l.date<=to&&l.status==='done');
+  const totalIncome=pays.reduce((a,p)=>a+Number(p.amount||0),0);
+  const totalLessons=lessons.filter(l=>l.type==='lesson'||l.type==='internal').length;
+  const totalTests=lessons.filter(l=>l.type==='test').length;
+  const byStudent={};
+  pays.forEach(p=>{
+    const s=S.students.find(x=>x.id===p.studentId);
+    const name=s?s.name:'לא ידוע';
+    if(!byStudent[name]) byStudent[name]={income:0,lessons:0};
+    byStudent[name].income+=Number(p.amount||0);
+  });
+  lessons.filter(l=>l.type==='lesson').forEach(l=>{
+    const s=S.students.find(x=>x.id===l.studentId);
+    const name=s?s.name:'לא ידוע';
+    if(!byStudent[name]) byStudent[name]={income:0,lessons:0};
+    byStudent[name].lessons++;
+  });
+  const studentRows=Object.entries(byStudent).sort((a,b)=>b[1].income-a[1].income)
+    .map(([name,d])=>`<tr><td>${name}</td><td style="text-align:center">${d.lessons}</td><td style="text-align:left">₪${d.income.toLocaleString()}</td></tr>`).join('');
+  const payRows=pays.map(p=>{
+    const s=S.students.find(x=>x.id===p.studentId);
+    return `<tr><td>${p.date}</td><td>${s?s.name:'—'}</td><td style="text-align:left">₪${Number(p.amount||0).toLocaleString()}</td><td>${p.method||'—'}</td><td>${p.receipt||''}</td></tr>`;
+  }).join('');
+  const html=`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8">
+  <title>דוח מאזן — דרייב פרו</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body{font-family:Arial,sans-serif;font-size:12px;margin:12px;color:#111}
+    @media(min-width:600px){body{font-size:13px;margin:20px}}
+    h1{font-size:18px;margin:0 0 4px}
+    h2{font-size:14px;margin:16px 0 8px;color:#1E40AF;border-bottom:2px solid #1E40AF;padding-bottom:4px}
+    .sub{color:#666;font-size:12px;margin:0 0 16px}
+    .kpis{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}
+    .kpi{background:#f1f5f9;border-radius:8px;padding:10px 16px;flex:1;min-width:80px;text-align:center}
+    .kpi-v{font-size:20px;font-weight:700;color:#1E40AF}
+    .kpi-l{font-size:11px;color:#666}
+    table{width:100%;border-collapse:collapse;margin-bottom:16px}
+    th{background:#1E40AF;color:#fff;padding:8px 10px;text-align:right}
+    td{padding:7px 10px;border-bottom:1px solid #e2e8f0}
+    tr:nth-child(even) td{background:#f8fafc}
+    @page{size:A4;margin:16mm 14mm}
+    @media print{.no-print{display:none!important}}
+    .btn-r{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;background:#1E40AF;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-left:8px}
+    .btn-g{background:#15803d}
+  </style>
+  </head><body>
+  <div class="no-print" style="margin-bottom:12px;display:flex;gap:8px">
+    <button class="btn-r" onclick="window.print()">🖨️ הדפס</button>
+    <button class="btn-r btn-g" id="btn-pdf">📥 שמור PDF</button>
+  </div>
+  <div id="rc">
+  <h1>דוח מאזן — בית ספר לנהיגה ברוך תור</h1>
+  <p class="sub">תקופה: ${from} עד ${to} | הופק: ${new Date().toLocaleDateString('he-IL')}</p>
+  <div class="kpis">
+    <div class="kpi"><div class="kpi-v">₪${totalIncome.toLocaleString()}</div><div class="kpi-l">הכנסות</div></div>
+    <div class="kpi"><div class="kpi-v">${totalLessons}</div><div class="kpi-l">שיעורים</div></div>
+    <div class="kpi"><div class="kpi-v">${totalTests}</div><div class="kpi-l">טסטים</div></div>
+    <div class="kpi"><div class="kpi-v">${pays.length}</div><div class="kpi-l">תשלומים</div></div>
+  </div>
+  <h2>פירוט לפי תלמיד</h2>
+  <table><thead><tr><th>שם תלמיד</th><th>שיעורים</th><th>הכנסה</th></tr></thead><tbody>${studentRows}</tbody></table>
+  <h2>פירוט תשלומים</h2>
+  <table><thead><tr><th>תאריך</th><th>תלמיד</th><th>סכום</th><th>אמצעי</th><th>קבלה</th></tr></thead><tbody>${payRows}</tbody>
+  <tfoot><tr style="background:#f1f5f9;font-weight:700"><td>סה"כ</td><td></td><td>₪${totalIncome.toLocaleString()}</td><td></td><td></td></tr></tfoot></table>
+  </div>
+  </body></html>`;
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  _injectPdf(w,'rc','דוח_מאזן_'+from+'_'+to);
+}
+
+function _injectPdf(w, contentId, filename){
+  // כפתור הדפסה — משאיר על חלון החדש
+  const printBtn=w.document.getElementById('btn-pdf');
+  if(printBtn) printBtn.setAttribute('data-pdf-filename', filename);
+
+  // PDF — מריץ html2pdf מתוך האפ הראשי על תוכן זמני
+  if(printBtn) printBtn.onclick=function(){
+    const srcEl=w.document.getElementById(contentId);
+    if(!srcEl) return;
+    const clone=document.createElement('div');
+    clone.dir='rtl';
+    clone.style.cssText='position:fixed;left:-9999px;top:0;width:794px;font-family:Arial,sans-serif;font-size:12px;color:#111;background:#fff;padding:20px';
+    // העתק סגנונות ותוכן
+    const styleEl=w.document.createElement('style');
+    Array.from(w.document.styleSheets).forEach(ss=>{
+      try{ Array.from(ss.cssRules).forEach(r=>{ styleEl.textContent+=r.cssText+'\n'; }); }catch(e){}
+    });
+    clone.appendChild(styleEl);
+    clone.innerHTML+=srcEl.outerHTML;
+    document.body.appendChild(clone);
+    html2pdf().set({
+      margin:[8,8,8,8],
+      filename: filename+'.pdf',
+      html2canvas:{scale:2,useCORS:true,logging:false},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+    }).from(clone).save().finally(()=>{ document.body.removeChild(clone); });
+  };
 }
 
 async function appInit(){
