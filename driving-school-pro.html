@@ -838,7 +838,7 @@ function renderDashboard(){
     <div class="db-greet">שלום ברוך 👋</div>
     <div class="db-title">לוח בקרה</div>
     <div class="db-box">
-      <div><div class="db-bl">שיעורים היום</div><div class="db-bv">${tl.length}</div></div>
+      <div><div class="db-bl">שיעורים היום</div><div class="db-bv">${tl.filter(l=>l.type!=='note'&&l.type!=='event').reduce((a,l)=>a+(parseFloat(l.duration)||1),0)}</div></div>
       <div style="text-align:left"><div class="db-bl">תלמידים פעילים</div><div class="db-bv">${active}</div></div>
     </div>
   </div>
@@ -1175,7 +1175,7 @@ function renderCalWeek(){
     </div>
     <div style="display:flex;padding:0 8px 10px">${headerHTML}</div>
   </div>
-  <div class="sh"><span class="st">שיעורים — ${selD.getDate()} ${HE_MONTHS[selD.getMonth()]}</span><button class="sa btn" onclick="showAddLesson(null,'lesson')">+ שיעור</button></div>
+  <div class="sh"><span class="st">שיעורים — ${selD.getDate()} ${HE_MONTHS[selD.getMonth()]} יום ${dayNames[selD.getDay()]}</span><button class="sa btn" onclick="showAddLesson(null,'lesson')">+ שיעור</button></div>
   ${ls.length===0?`<div style="padding:8px 16px;font-size:13px;color:var(--t3)">אין שיעורים ביום זה</div>`:ls.map(l=>lessonCard(l)).join('')}
   <div style="height:80px"></div>
   <button class="fab" onclick="showAddLesson()">＋</button>`;
@@ -1464,11 +1464,6 @@ function showEditStudent(id){
       <div class="fg"><label class="fl">ת"ז</label><input class="fi" id="f-idnum" type="text" maxlength="9" value="${s?s.idnum||'':''}" placeholder="000000000" oninput="validateTZField(this)"><div id="tz-err" style="font-size:12px;color:var(--er);margin-top:3px;display:none">❌ מספר זהות לא תקין</div></div>
       <div class="fg"><label class="fl">מייל</label><input class="fi" id="f-email" type="email" value="${s?s.email||'':''}" placeholder="name@gmail.com"></div>
     </div>
-    <div class="fg">
-      <label class="fl">🟢 WhatsApp CallMeBot Key <span style="font-size:11px;color:var(--t2)">(לשליחת תזכורת שעה לפני שיעור)</span></label>
-      <input class="fi" id="f-wabotkey" type="text" value="${s?s.wabotKey||'':''}" placeholder="הכנס API key לאחר הפעלת CallMeBot">
-      <div style="font-size:11px;color:var(--t2);margin-top:4px">הפעלה: שלח "I allow callmebot to send me messages" ל-+34 644 49 09 52 בוואטסאפ → קבל key</div>
-    </div>
     <div class="frow">
       <div class="fg"><label class="fl">סוג קליטה</label>
         <select class="fi fsel" id="f-regtype" onchange="updateRegFeeDefault()">
@@ -1591,13 +1586,12 @@ function saveStudent(id){
   }
 
   const regFee=Number(document.getElementById('f-regfee')?.value)||0;
-  const wabotKey=document.getElementById('f-wabotkey')?.value?.trim()||'';
   const student={
     id:id||uid(), name, phone, dob, idnum, email, regType, regFee, regPaid, pkg, price, startDate:startDate||todayStr(), notes,
     status: id?(S.students.find(s=>s.id===id)?.status||'active'):'active',
     health:false, vision:false, theory:false, internal:false, parking:false,
     ...(id?S.students.find(s=>s.id===id)||{}:{}),
-    name, phone, dob, idnum, email, regType, regFee, regPaid, pkg, price, startDate:startDate||todayStr(), notes, wabotKey
+    name, phone, dob, idnum, email, regType, regFee, regPaid, pkg, price, startDate:startDate||todayStr(), notes
   };
   dbStudent(student);
   closeModal();
@@ -2154,7 +2148,7 @@ function printStudentReport(sid){
     <td>${p.date}</td>
     <td style="text-align:left;font-weight:700;color:#15803d">₪${Number(p.amount||0).toLocaleString()}</td>
     <td>${p.method||'—'}</td>
-    <td>${p.receipt||''}</td>
+    <td>${p.receiptNum||''}</td>
     <td style="font-size:11px;color:#555">${p.notes||''}</td>
   </tr>`).join('');
   const debtColor=bal.debt>0?'#b91c1c':bal.debt<0?'#15803d':'#15803d';
