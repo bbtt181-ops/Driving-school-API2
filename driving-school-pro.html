@@ -838,7 +838,7 @@ function renderDashboard(){
     <div class="db-greet">שלום ברוך 👋</div>
     <div class="db-title">לוח בקרה</div>
     <div class="db-box">
-      <div><div class="db-bl">יחידות היום</div><div class="db-bv">${tl.filter(l=>l.type!=='note'&&l.type!=='event').reduce((a,l)=>a+(parseFloat(l.duration)||1),0)}</div></div>
+      <div><div class="db-bl">שיעורים היום</div><div class="db-bv">${tl.filter(l=>l.type!=='note'&&l.type!=='event').length}</div></div>
       <div style="text-align:left"><div class="db-bl">תלמידים פעילים</div><div class="db-bv">${active}</div></div>
     </div>
   </div>
@@ -1175,7 +1175,7 @@ function renderCalWeek(){
     </div>
     <div style="display:flex;padding:0 8px 10px">${headerHTML}</div>
   </div>
-  <div class="sh"><span class="st">שיעורים — ${selD.getDate()} ${HE_MONTHS[selD.getMonth()]}</span><button class="sa btn" onclick="showAddLesson(null,'lesson')">+ שיעור</button></div>
+  <div class="sh"><span class="st">שיעורים — ${selD.getDate()} ${HE_MONTHS[selD.getMonth()]} יום ${dayNames[selD.getDay()]}</span><button class="sa btn" onclick="showAddLesson(null,'lesson')">+ שיעור</button></div>
   ${ls.length===0?`<div style="padding:8px 16px;font-size:13px;color:var(--t3)">אין שיעורים ביום זה</div>`:ls.map(l=>lessonCard(l)).join('')}
   <div style="height:80px"></div>
   <button class="fab" onclick="showAddLesson()">＋</button>`;
