@@ -1165,7 +1165,7 @@ function renderCalWeek(){
 
   let selDate=S.calSel?`${S.calSel.y}-${String(S.calSel.m+1).padStart(2,'0')}-${String(S.calSel.d).padStart(2,'0')}`:todayStr2;
   const ls=S.lessons.filter(l=>l.date===selDate).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
-  const selD=new Date(selDate);
+  const selD=S.calSel?new Date(S.calSel.y,S.calSel.m,S.calSel.d):new Date();
   return `
   <div class="card" style="margin:10px 16px 0">
     <div class="cal-hdr">
