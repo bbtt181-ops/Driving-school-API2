@@ -838,7 +838,7 @@ function renderDashboard(){
     <div class="db-greet">שלום ברוך 👋</div>
     <div class="db-title">לוח בקרה</div>
     <div class="db-box">
-      <div><div class="db-bl">שיעורים היום</div><div class="db-bv">${tl.filter(l=>l.type!=='note'&&l.type!=='event').length}</div></div>
+      <div><div class="db-bl">שיעורים היום</div><div class="db-bv">${tl.filter(l=>l.type!=='note'&&l.type!=='event').reduce((a,l)=>a+(parseFloat(l.duration)||1),0)}</div></div>
       <div style="text-align:left"><div class="db-bl">תלמידים פעילים</div><div class="db-bv">${active}</div></div>
     </div>
   </div>
