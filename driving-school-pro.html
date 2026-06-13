@@ -520,7 +520,8 @@ const S = {
   detailTab: 'overview',
   searchQ: '',
   payFilter: 'all',
-  calView: 'month'
+  paySearchQ: '',
+  calView: 'week'
 };
 
 // ═══════════════════════════════════════════════
@@ -911,6 +912,7 @@ function renderStudents(){
 
 function setFilter(f){ S.studentFilter=f; renderContent(); }
 function searchStudents(q){ S.searchQ=q; renderContent(); setTimeout(()=>{const inp=document.getElementById('search-q');if(inp){inp.focus();inp.setSelectionRange(q.length,q.length);}},0); }
+function searchPayments(q){ S.paySearchQ=q; renderContent(); setTimeout(()=>{const inp=document.getElementById('pay-search-q');if(inp){inp.focus();inp.setSelectionRange(q.length,q.length);}},0); }
 function openStudent(id){ S.selStudent=id; S.detailTab='overview'; navigate('student-detail',id); }
 
 // ═══════════════════════════════════════════════
@@ -1204,7 +1206,7 @@ function lessonCard(l){
   const stIco={done:'✅',cancelled:'❌',noshow:'⚠️',scheduled:'🕐',failed:'💔'};
   const typeColors={
     lesson:  {bg:'#3B1FA3',border:'#6D4FD6'},
-    test:    {bg:'#7C1D1D',border:'#F87171'},
+    test:    {bg:'#DC2626',border:'#FCA5A5'},
     internal:{bg:'#064E3B',border:'#10B981'},
     parking: {bg:'#1E3A5F',border:'#3B82F6'},
     event:   {bg:'#365314',border:'#84CC16'},
@@ -1253,10 +1255,26 @@ function renderPayments(){
   const activeStudents=S.students.filter(s=>s.status==='active');
   const debtList=activeStudents.map(s=>({...s,bal:calcBalance(s.id)})).filter(s=>s.bal.debt>0).sort((a,b)=>b.bal.debt-a.bal.debt);
 
-  // recent payments (last 30)
-  const recent=S.payments.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30);
-  const payHTML=recent.length===0?`<div class="empty"><div class="empty-ico">💸</div><div class="empty-t">אין תשלומים עדיין</div></div>`:
-    `<div class="card" style="margin:0 16px">${recent.map(p=>{
+  // חיפוש תשלומים — שם, טלפון, ת"ז, מס' קבלה
+  let recent=S.payments.slice().sort((a,b)=>b.date.localeCompare(a.date));
+  if(S.paySearchQ){
+    const q=S.paySearchQ.trim();
+    const qDigits=q.replace(/[-\s]/g,'');
+    recent=recent.filter(p=>{
+      const st=S.students.find(s=>s.id===p.studentId);
+      const name=st?.name||'';
+      const phone=String(st?.phone||'').replace(/[-\s]/g,'');
+      const idnum=String(st?.idnum||st?.idNum||'');
+      const receipt=String(p.receiptNum||'');
+      return name.toLowerCase().includes(q.toLowerCase())
+        || (qDigits&&phone.includes(qDigits))
+        || (qDigits&&idnum.includes(qDigits))
+        || (qDigits&&receipt.includes(qDigits));
+    });
+  }
+  const recentLimited=recent.slice(0,30);
+  const payHTML=recentLimited.length===0?`<div class="empty"><div class="empty-ico">💸</div><div class="empty-t">${S.paySearchQ?'לא נמצאו תשלומים מתאימים':'אין תשלומים עדיין'}</div></div>`:
+    `<div class="card" style="margin:0 16px">${recentLimited.map(p=>{
       const st=S.students.find(s=>s.id===p.studentId);
       return `<div class="pi" onclick="openPayment('${p.id}')" style="cursor:pointer">
         <div class="pi-ico pi-in">💵</div>
@@ -1281,6 +1299,7 @@ function renderPayments(){
   <div class="sh"><span class="st">חייבים</span></div>
   ${debtHTML}
   <div class="sh"><span class="st">תשלומים אחרונים</span><button class="sa btn" onclick="showAddPayment()">+ תשלום</button></div>
+  <div class="srch" style="margin:0 16px 8px"><span class="srch-ico">🔍</span><input id="pay-search-q" class="fi" placeholder="חיפוש לפי שם, טלפון, ת&quot;ז, מס' קבלה..." value="${S.paySearchQ}" oninput="searchPayments(this.value)"></div>
   ${payHTML}
   <div style="height:90px"></div>`;
 }
@@ -2003,20 +2022,21 @@ function toggleDark(){
 // אוטומציה: שיעורים שעבר תאריכם → מתוכנן → בוצע
 function autoFixPastScheduled(){
   const today=todayStr();
-  let changed=0;
+  const changedLessons=[];
   S.lessons.forEach(l=>{
     if(l.status==='scheduled' && l.date && l.date<today){
       l.status='done';
-      changed++;
+      changedLessons.push(l);
     }
   });
-  if(changed>0){
+  if(changedLessons.length>0){
     dbSave();
     // סנכרן לשיטס ברקע
     if(hasAPI()){
-      S.lessons.filter(l=>l.status==='done').forEach(l=>apiPost('save','lesson',l));
+      changedLessons.forEach(l=>apiPost('save','Lessons',l));
     }
-    console.log('[AutoFix] '+changed+' שיעורים עודכנו לבוצע');
+    console.log('[AutoFix] '+changedLessons.length+' שיעורים עודכנו לבוצע');
+    renderContent();
   }
 }
 
@@ -2391,7 +2411,7 @@ async function appInit(){
   if(hasAPI()){
     showSyncStatus('⟳ מסנכרן עם Sheets...');
     const ok = await apiLoadAll();
-    if(ok){ showSyncStatus('✅ מסונכרן', 2500); renderContent(); }
+    if(ok){ showSyncStatus('✅ מסונכרן', 2500); autoFixPastScheduled(); renderContent(); }
     else   { showSyncStatus('⚠️ עובד מקומית', 2500); }
   }
 }
