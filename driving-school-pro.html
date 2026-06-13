@@ -1070,7 +1070,7 @@ function setDetailTab(t){ S.detailTab=t; renderContent(); }
 // renderCalendar מוגדרת למטה עם תמיכה בגריד
 
 function renderCalendar(){
-  if(!S.calView) S.calView='month';
+  if(!S.calView) S.calView='week';
   const seg=`<div class="seg" style="margin:10px 16px 0">
     <div class="seg-btn ${S.calView==='month'?'active':''}" onclick="setCalView('month')">חודש</div>
     <div class="seg-btn ${S.calView==='week'?'active':''}" onclick="setCalView('week')">שבוע</div>
