@@ -520,7 +520,8 @@ const S = {
   detailTab: 'overview',
   searchQ: '',
   payFilter: 'all',
-  calView: 'month'
+  paySearchQ: '',
+  calView: 'week'
 };
 
 // ═══════════════════════════════════════════════
@@ -1253,8 +1254,15 @@ function renderPayments(){
   const activeStudents=S.students.filter(s=>s.status==='active');
   const debtList=activeStudents.map(s=>({...s,bal:calcBalance(s.id)})).filter(s=>s.bal.debt>0).sort((a,b)=>b.bal.debt-a.bal.debt);
 
-  // recent payments (last 30)
-  const recent=S.payments.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30);
+  // recent payments (last 30) with search filter
+  let recent=S.payments.sort((a,b)=>b.date.localeCompare(a.date)).slice(0,30);
+  if(S.paySearchQ){
+    const q=S.paySearchQ.toLowerCase();
+    recent=recent.filter(p=>{
+      const st=S.students.find(s=>s.id===p.studentId);
+      return st&&st.name.toLowerCase().includes(q);
+    });
+  }
   const payHTML=recent.length===0?`<div class="empty"><div class="empty-ico">💸</div><div class="empty-t">אין תשלומים עדיין</div></div>`:
     `<div class="card" style="margin:0 16px">${recent.map(p=>{
       const st=S.students.find(s=>s.id===p.studentId);
@@ -1274,6 +1282,11 @@ function renderPayments(){
     </div>`).join('')}</div>`;
 
   return `
+  <div style="padding:12px 16px">
+    <div class="fg" style="margin-bottom:12px"><label class="fl">חיפוש בשם</label>
+      <input class="fi" id="pay-search-q" type="text" placeholder="חפש לפי שם תלמיד" value="${S.paySearchQ}" oninput="S.paySearchQ=this.value;renderContent()">
+    </div>
+  </div>
   <div class="kpi-grid">
     <div class="kpi kp"><div class="kpi-ico">📈</div><div class="kpi-val">${fmtCur(income)}</div><div class="kpi-lbl">הכנסה החודש</div></div>
     <div class="kpi kr"><div class="kpi-ico">📉</div><div class="kpi-val">${fmtCur(debt)}</div><div class="kpi-lbl">חוב כולל</div></div>
