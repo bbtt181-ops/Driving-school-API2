@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>עיצוב ג׳ — מובייל פירסט</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f4ff;color:#1e293b;min-height:100vh}
+
+/* TOP HEADER */
+.header{background:linear-gradient(135deg,#1e40af,#3b82f6);color:#fff;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 20px rgba(30,64,175,.4)}
+.header-right{display:flex;align-items:center;gap:10px}
+.header h1{font-size:18px;font-weight:800}
+.header-sub{font-size:11px;opacity:.8}
+.header-actions{display:flex;gap:8px}
+.hbtn{background:rgba(255,255,255,.2);border:none;color:#fff;padding:7px 14px;border-radius:20px;font-size:12px;cursor:pointer;font-family:inherit;font-weight:600;backdrop-filter:blur(10px)}
+.hbtn.primary{background:#fff;color:#1e40af}
+
+/* CONTENT */
+.content{padding:20px;max-width:1200px;margin:0 auto}
+
+/* TODAY BANNER */
+.today-banner{background:linear-gradient(135deg,#1e40af,#6366f1);border-radius:20px;padding:20px;color:#fff;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
+.today-banner h2{font-size:16px;font-weight:700;margin-bottom:4px}
+.today-banner p{font-size:13px;opacity:.85}
+.today-lessons{display:flex;gap:12px}
+.today-pill{background:rgba(255,255,255,.2);border-radius:12px;padding:10px 16px;text-align:center;backdrop-filter:blur(10px)}
+.today-pill .num{font-size:24px;font-weight:800}
+.today-pill .lbl{font-size:10px;opacity:.85}
+
+/* KPI GRID */
+.kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:20px}
+.kpi-card{background:#fff;border-radius:16px;padding:16px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+.kpi-icon{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.icon-red{background:#fee2e2}
+.icon-green{background:#dcfce7}
+.icon-blue{background:#dbeafe}
+.icon-purple{background:#ede9fe}
+.kpi-card .val{font-size:20px;font-weight:800}
+.kpi-card .lbl{font-size:11px;color:#64748b;margin-top:2px}
+.kpi-card .trend{font-size:11px;color:#22c55e;margin-top:2px}
+
+/* TIMELINE */
+.section-title{font-size:15px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.see-all{font-size:12px;color:#3b82f6;font-weight:600;cursor:pointer}
+
+.timeline{margin-bottom:20px}
+.tl-item{background:#fff;border-radius:16px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 8px rgba(0,0,0,.05);cursor:pointer;transition:transform .1s}
+.tl-item:hover{transform:scale(1.01)}
+.tl-time{text-align:center;min-width:48px}
+.tl-time .h{font-size:16px;font-weight:800;color:#1e40af}
+.tl-time .m{font-size:11px;color:#94a3b8}
+.tl-divider{width:3px;height:48px;border-radius:4px;flex-shrink:0}
+.div-blue{background:#3b82f6}
+.div-green{background:#22c55e}
+.div-yellow{background:#f59e0b}
+.tl-info{flex:1}
+.tl-info .name{font-size:14px;font-weight:700}
+.tl-info .meta{font-size:12px;color:#64748b;margin-top:2px}
+.tl-price{font-size:15px;font-weight:800;color:#1e40af}
+.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.dot-blue{background:#3b82f6}
+.dot-green{background:#22c55e}
+.dot-yellow{background:#f59e0b}
+
+/* DEBTORS */
+.debtors-list{margin-bottom:80px}
+.debtor-card{background:#fff;border-radius:16px;padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(0,0,0,.05);cursor:pointer}
+.debtor-avatar{width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#fff;flex-shrink:0}
+.debtor-info{flex:1}
+.debtor-info .name{font-size:13px;font-weight:700}
+.debtor-info .sub{font-size:11px;color:#94a3b8;margin-top:2px}
+.debtor-amount{text-align:left}
+.debtor-amount .amount{font-size:15px;font-weight:800}
+.debtor-amount .badge{display:block;font-size:10px;border-radius:8px;padding:2px 8px;margin-top:3px;text-align:center}
+.amount-high{color:#dc2626}
+.badge-high{background:#fee2e2;color:#dc2626}
+.amount-mid{color:#ea580c}
+.badge-mid{background:#ffedd5;color:#ea580c}
+
+/* BOTTOM NAV */
+.bottom-nav{position:fixed;bottom:0;right:0;left:0;background:#fff;border-top:1px solid #e2e8f0;display:flex;box-shadow:0 -4px 20px rgba(0,0,0,.08);z-index:100}
+.bn-item{flex:1;display:flex;flex-direction:column;align-items:center;padding:10px 4px;cursor:pointer;color:#94a3b8;font-size:10px;gap:4px;position:relative}
+.bn-item.active{color:#1e40af}
+.bn-item .bn-icon{font-size:22px}
+.bn-item.active::after{content:'';position:absolute;bottom:0;right:20%;left:20%;height:2px;background:#1e40af;border-radius:2px 2px 0 0}
+.bn-badge{position:absolute;top:6px;right:calc(50% - 18px);background:#ef4444;color:#fff;border-radius:10px;padding:1px 5px;font-size:9px;font-weight:700}
+
+/* FAB */
+.fab{position:fixed;bottom:76px;left:20px;width:56px;height:56px;background:linear-gradient(135deg,#1e40af,#3b82f6);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:28px;color:#fff;box-shadow:0 6px 20px rgba(30,64,175,.5);cursor:pointer;z-index:200}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-right">
+    <div>
+      <div class="header h1" style="font-size:18px;font-weight:800">🚗 DSP Drive</div>
+      <div class="header-sub">שני, 18 מאי 2026</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="hbtn">🔔</button>
+    <button class="hbtn primary">+ תלמיד</button>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- TODAY BANNER -->
+  <div class="today-banner">
+    <div>
+      <h2>שיעורי היום</h2>
+      <p>18 מאי 2026 · יום שני</p>
+    </div>
+    <div class="today-lessons">
+      <div class="today-pill"><div class="num">4</div><div class="lbl">מתוכנן</div></div>
+      <div class="today-pill"><div class="num">2</div><div class="lbl">בוצע</div></div>
+      <div class="today-pill"><div class="num">1</div><div class="lbl">בוטל</div></div>
+    </div>
+  </div>
+
+  <!-- KPI -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-icon icon-red">⚠️</div>
+      <div><div class="val">₪25,285</div><div class="lbl">חוב פתוח</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon icon-green">💰</div>
+      <div><div class="val">₪0</div><div class="lbl">הכנסות החודש</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon icon-blue">📚</div>
+      <div><div class="val">0</div><div class="lbl">שיעורים החודש</div></div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-icon icon-purple">👥</div>
+      <div><div class="val">0</div><div class="lbl">תלמידים פעילים</div></div>
+    </div>
+  </div>
+
+  <!-- TIMELINE -->
+  <div class="section-title">לוח יום <span class="see-all">כל השיעורים ›</span></div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-time"><div class="h">09</div><div class="m">:00</div></div>
+      <div class="tl-divider div-green"></div>
+      <div class="tl-info"><div class="name">נחמן בן חיים</div><div class="meta">שיעור בודד · ₪180</div></div>
+      <div class="status-dot dot-green"></div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time"><div class="h">11</div><div class="m">:30</div></div>
+      <div class="tl-divider div-blue"></div>
+      <div class="tl-info"><div class="name">איתי בר שלום</div><div class="meta">שיעור כפול · ₪360</div></div>
+      <div class="status-dot dot-blue"></div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time"><div class="h">14</div><div class="m">:00</div></div>
+      <div class="tl-divider div-blue"></div>
+      <div class="tl-info"><div class="name">רואי מטילסקי</div><div class="meta">וחצי · ₪270</div></div>
+      <div class="status-dot dot-blue"></div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time"><div class="h">16</div><div class="m">:40</div></div>
+      <div class="tl-divider div-yellow"></div>
+      <div class="tl-info"><div class="name">אסף חי טלמון</div><div class="meta">טסט · ₪230</div></div>
+      <div class="status-dot dot-yellow"></div>
+    </div>
+  </div>
+
+  <!-- DEBTORS -->
+  <div class="section-title">חייבים עיקריים <span class="see-all">הכל ›</span></div>
+  <div class="debtors-list">
+    <div class="debtor-card">
+      <div class="debtor-avatar" style="background:#ef4444">א</div>
+      <div class="debtor-info"><div class="name">אסף חי טלמון</div><div class="sub">19 שיעורים · שולם ₪50</div></div>
+      <div class="debtor-amount"><div class="amount amount-high">₪3,365</div><span class="badge badge-high">חוב גבוה</span></div>
+    </div>
+    <div class="debtor-card">
+      <div class="debtor-avatar" style="background:#f97316">ר</div>
+      <div class="debtor-info"><div class="name">רואי מטילסקי</div><div class="sub">28 שיעורים · שולם ₪2,250</div></div>
+      <div class="debtor-amount"><div class="amount amount-high">₪2,870</div><span class="badge badge-high">חוב גבוה</span></div>
+    </div>
+    <div class="debtor-card">
+      <div class="debtor-avatar" style="background:#3b82f6">א</div>
+      <div class="debtor-info"><div class="name">איתי בר שלום</div><div class="sub">14 שיעורים · שולם ₪0</div></div>
+      <div class="debtor-amount"><div class="amount amount-high">₪2,800</div><span class="badge badge-high">חוב גבוה</span></div>
+    </div>
+    <div class="debtor-card">
+      <div class="debtor-avatar" style="background:#8b5cf6">נ</div>
+      <div class="debtor-info"><div class="name">נחמן בן חיים</div><div class="sub">43 שיעורים · שולם ₪6,470</div></div>
+      <div class="debtor-amount"><div class="amount amount-mid">₪1,300</div><span class="badge badge-mid">חוב פעיל</span></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FAB -->
+<div class="fab">+</div>
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav">
+  <div class="bn-item active"><div class="bn-icon">🏠</div>בית</div>
+  <div class="bn-item"><div class="bn-icon">🗓️</div>קלנדר</div>
+  <div class="bn-item"><div class="bn-icon">👥</div>תלמידים<span class="bn-badge">3</span></div>
+  <div class="bn-item"><div class="bn-icon">💰</div>תשלומים</div>
+  <div class="bn-item"><div class="bn-icon">📊</div>דוחות</div>
+</div>
+
+</body>
+</html>
