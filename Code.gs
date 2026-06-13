@@ -4,7 +4,7 @@
 // ============================================================
 
 // ── קונפיגורציה ──
-const SS_ID = '1pN5Hs5t2PkwPKgq1gHFFFC3Zn0VZi-RQ8XO4NOkdaEA';
+const SS_ID = '1v-7JPq9huUjZYaqPFn05JRnlmlJt7I3886H_bZuAN7Q';
 
 // מחירון שיעורים
 const PRICE_OPTIONS = [160, 170, 180, 190];

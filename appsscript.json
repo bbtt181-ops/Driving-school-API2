@@ -10,6 +10,9 @@
   "oauthScopes": [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/calendar.readonly",
-    "https://www.googleapis.com/auth/script.webapp.deploy"
+    "https://www.googleapis.com/auth/script.webapp.deploy",
+    "https://www.googleapis.com/auth/script.scriptapp",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://mail.google.com/"
   ]
 }
